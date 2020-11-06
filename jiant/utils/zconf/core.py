@@ -16,6 +16,14 @@ def _is_true(x):
     return x == "True"
 
 
+def _json_pretty_dumps(dic):
+    return json.dumps(dic,
+                      ensure_ascii=False,
+                      indent=4,
+                      sort_keys=True,
+                      separators=(',', ': '))
+
+
 # noinspection PyShadowingBuiltins
 def argparse_attr(
     default=attr.NOTHING,
@@ -139,7 +147,7 @@ def to_json(self):
     for key, val in serialized_dict.items():
         if isinstance(val, pathlib.Path):
             serialized_dict[key] = str(val)
-    return json.dumps(serialized_dict, indent=2)
+    return _json_pretty_dumps(serialized_dict)
 
 
 def _inst_copy(self):
@@ -272,7 +280,14 @@ class RunConfig:
         for key, val in serialized_dict.items():
             if isinstance(val, pathlib.Path):
                 serialized_dict[key] = str(val)
-        return json.dumps(serialized_dict, indent=2)
+        return _json_pretty_dumps(serialized_dict)
+
+    def to_json_path(self, json_path):
+        path = pathlib.Path(json_path)
+        if not path.parent.exists():
+            path.parent.mkdir(exist_ok=True, parents=True)
+        with open(json_path, "w") as f:
+            f.write(self.to_json())
 
     def copy(self):
         return copylib.deepcopy(self)
