@@ -188,7 +188,7 @@ def run_loop(args: RunConfiguration, checkpoint=None):
                 return_preds=args.write_train_preds,
             )
             jiant_evaluate.write_train_eval_results(
-                train_results_dict=train_eval_results_dict,
+                results_dict=train_eval_results_dict,
                 metrics_aggregator=runner.jiant_task_container.metrics_aggregator,
                 output_dir=args.output_dir,
                 verbose=True,
@@ -207,7 +207,7 @@ def run_loop(args: RunConfiguration, checkpoint=None):
                 return_preds=args.write_val_preds,
             )
             jiant_evaluate.write_val_results(
-                val_results_dict=train_eval_results_dict,
+                results_dict=train_eval_results_dict,
                 metrics_aggregator=runner.jiant_task_container.metrics_aggregator,
                 output_dir=args.output_dir,
                 verbose=True,
@@ -223,8 +223,14 @@ def run_loop(args: RunConfiguration, checkpoint=None):
         if args.write_test_preds:
             test_results_dict = runner.run_test(
                 task_name_list=runner.jiant_task_container.task_run_config.test_task_list,
+                return_preds=args.write_test_preds,
             )
-
+            jiant_evaluate.write_test_results(
+                results_dict=test_results_dict,
+                metrics_aggregator=runner.jiant_task_container.metrics_aggregator,
+                output_dir=args.output_dir,
+                verbose=True,
+            )
             jiant_evaluate.write_preds(
                 eval_results_dict=test_results_dict,
                 path=os.path.join(args.output_dir, "test_preds.p"),

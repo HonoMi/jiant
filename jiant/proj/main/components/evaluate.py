@@ -11,12 +11,16 @@ import jiant.proj.main.components.task_sampler as jiant_task_sampler
 from machine_learning.dataset.preprocessing.pandas_dataframe import jsonify as jsonify_df
 
 
-def write_train_eval_results(train_results_dict, metrics_aggregator, output_dir, verbose=True):
-    _write_results("train", train_results_dict, metrics_aggregator, output_dir, verbose=verbose)
+def write_train_eval_results(results_dict, metrics_aggregator, output_dir, verbose=True):
+    _write_results("train", results_dict, metrics_aggregator, output_dir, verbose=verbose)
 
 
-def write_val_results(val_results_dict, metrics_aggregator, output_dir, verbose=True):
-    _write_results("val", val_results_dict, metrics_aggregator, output_dir, verbose=verbose)
+def write_val_results(results_dict, metrics_aggregator, output_dir, verbose=True):
+    _write_results("val", results_dict, metrics_aggregator, output_dir, verbose=verbose)
+
+
+def write_test_results(results_dict, metrics_aggregator, output_dir, verbose=True):
+    _write_results("test", results_dict, metrics_aggregator, output_dir, verbose=verbose)
     
 
 def _write_results(split: str, results_dict, metrics_aggregator, output_dir, verbose=True):

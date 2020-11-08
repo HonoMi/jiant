@@ -141,7 +141,16 @@ class JiantRunner:
         )
         return self._run_eval(task_name_list, dataloader_dict, labels_dict,
                               phase=PHASE.VAL, use_subset=use_subset, return_preds=return_preds)
-           
+
+    def run_test(self, task_name_list, use_subset=None, return_preds=False, verbose=True):
+        dataloader_dict = self.get_test_dataloader_dict()
+        labels_dict = self.get_test_labels_dict(
+            task_name_list=task_name_list, use_subset=use_subset,
+        )
+
+        return self._run_eval(task_name_list, dataloader_dict, labels_dict,
+                              phase=PHASE.TEST, use_subset=use_subset, return_preds=return_preds)
+
     def _run_eval(self,
                   task_name_list,
                   dataloader_dict,
@@ -166,20 +175,20 @@ class JiantRunner:
             )
         return evaluate_dict
 
-    def run_test(self, task_name_list, verbose=True):
-        evaluate_dict = {}
-        test_dataloader_dict = self.get_test_dataloader_dict()
-        for task_name in task_name_list:
-            task = self.jiant_task_container.task_dict[task_name]
-            evaluate_dict[task_name] = run_test(
-                test_dataloader=test_dataloader_dict[task_name],
-                jiant_model=self.jiant_model,
-                task=task,
-                device=self.device,
-                local_rank=self.rparams.local_rank,
-                verbose=verbose,
-            )
-        return evaluate_dict
+    # def run_test(self, task_name_list, verbose=True):
+    #     evaluate_dict = {}
+    #     test_dataloader_dict = self.get_test_dataloader_dict()
+    #     for task_name in task_name_list:
+    #         task = self.jiant_task_container.task_dict[task_name]
+    #         evaluate_dict[task_name] = run_test(
+    #             test_dataloader=test_dataloader_dict[task_name],
+    #             jiant_model=self.jiant_model,
+    #             task=task,
+    #             device=self.device,
+    #             local_rank=self.rparams.local_rank,
+    #             verbose=verbose,
+    #         )
+    #     return evaluate_dict
 
     def get_train_dataloader_dict(self, for_eval=False, use_subset=False):
         # Not currently supported distributed parallel
@@ -230,6 +239,9 @@ class JiantRunner:
 
     def get_val_labels_dict(self, task_name_list, use_subset=False):
         return self._get_labels_dict(task_name_list, "val", use_subset=use_subset)
+
+    def get_test_labels_dict(self, task_name_list, use_subset=False):
+        return self._get_labels_dict(task_name_list, "test", use_subset=use_subset)
 
     def _get_labels_dict(self, task_name_list, split: str, use_subset=False):
         labels_dict = {}
@@ -301,13 +313,15 @@ def run_val(
     # Reminder:
     #   val_dataloader contains mostly PyTorch-relevant info
     #   val_labels might contain more details information needed for full evaluation
+    has_labels = True  # TODO: データセットにラベルが存在するかどうかを自動判定する．
+
     if not local_rank == -1:
         return
     jiant_model.eval()
-    total_eval_loss = 0
-    nb_eval_steps, nb_eval_examples = 0, 0
     evaluation_scheme = evaluate.get_evaluation_scheme_for_task(task=task)
     eval_accumulator = evaluation_scheme.get_accumulator()
+    total_eval_loss = 0
+    nb_eval_steps, nb_eval_examples = 0, 0
 
     for step, (batch, batch_metadata) in enumerate(
         maybe_tqdm(val_dataloader, desc=f"Eval ({task.name}, {str(phase)})", verbose=verbose)
@@ -316,10 +330,13 @@ def run_val(
 
         with torch.no_grad():
             model_output = wrap_jiant_forward(
-                jiant_model=jiant_model, batch=batch, task=task, compute_loss=True,
+                jiant_model=jiant_model, batch=batch, task=task, compute_loss=has_labels,
             )
         batch_logits = model_output.logits.detach().cpu().numpy()
-        batch_loss = model_output.loss.mean().item()
+        if has_labels:
+            batch_loss = model_output.loss.mean().item()
+        else:
+            batch_loss = 0
         total_eval_loss += batch_loss
         eval_accumulator.update(
             batch_logits=batch_logits,
@@ -330,19 +347,22 @@ def run_val(
 
         nb_eval_examples += len(batch)
         nb_eval_steps += 1
+
     eval_loss = total_eval_loss / nb_eval_steps
-    tokenizer = (
-        jiant_model.tokenizer
-        if not torch_utils.is_data_parallel(jiant_model)
-        else jiant_model.module.tokenizer
-    )
     output = {
         "accumulator": eval_accumulator,
-        "loss": eval_loss,
-        "metrics": evaluation_scheme.compute_metrics_from_accumulator(
-            task=task, accumulator=eval_accumulator, labels=val_labels, tokenizer=tokenizer,
-        ),
     }
+    if has_labels:
+        tokenizer = (
+            jiant_model.tokenizer
+            if not torch_utils.is_data_parallel(jiant_model) else jiant_model.module.tokenizer
+        )
+        output.update({
+            "loss": eval_loss,
+            "metrics": evaluation_scheme.compute_metrics_from_accumulator(
+                task=task, accumulator=eval_accumulator, labels=val_labels, tokenizer=tokenizer,
+            ),
+        })
     if return_preds:
         output["preds"] = evaluation_scheme.get_preds_from_accumulator(
             task=task, accumulator=eval_accumulator,
