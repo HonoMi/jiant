@@ -1,6 +1,7 @@
 import os
 import torch
-
+import logging
+import traceback
 
 import jiant.proj.main.modeling.model_setup as jiant_model_setup
 import jiant.proj.main.runner as jiant_runner
@@ -13,6 +14,8 @@ import jiant.shared.model_setup as model_setup
 import jiant.utils.torch_utils as torch_utils
 import jiant.utils.python.io as py_io
 import jiant.utils.zconf as zconf
+
+logger = logging.getLogger(__name__)
 
 
 @zconf.run_config
@@ -30,8 +33,11 @@ class RunConfiguration(zconf.RunConfig):
 
     # === Running Setup === #
     do_train = zconf.attr(action="store_true")
+    do_train_eval = zconf.attr(action="store_true")
     do_val = zconf.attr(action="store_true")
     do_save = zconf.attr(action="store_true")
+
+    write_train_preds = zconf.attr(action="store_true")
     write_val_preds = zconf.attr(action="store_true")
     write_test_preds = zconf.attr(action="store_true")
     eval_every_steps = zconf.attr(type=int, default=0)
@@ -40,13 +46,6 @@ class RunConfiguration(zconf.RunConfig):
     no_improvements_for_n_evals = zconf.attr(type=int, default=0)
     delete_checkpoint_if_done = zconf.attr(action="store_true")
     force_overwrite = zconf.attr(action="store_true")
-    seed = zconf.attr(type=int, default=-1)
-
-    # === Training Learning Parameters === #
-    learning_rate = zconf.attr(default=1e-5, type=float)
-    adam_epsilon = zconf.attr(default=1e-8, type=float)
-    max_grad_norm = zconf.attr(default=1.0, type=float)
-    optimizer_type = zconf.attr(default="adam", type=str)
 
     # Specialized config
     no_cuda = zconf.attr(action="store_true")
@@ -55,6 +54,13 @@ class RunConfiguration(zconf.RunConfig):
     local_rank = zconf.attr(default=-1, type=int)
     server_ip = zconf.attr(default="", type=str)
     server_port = zconf.attr(default="", type=str)
+
+    # === Training Learning Parameters === #
+    learning_rate = zconf.attr(default=1e-5, type=float)
+    adam_epsilon = zconf.attr(default=1e-8, type=float)
+    max_grad_norm = zconf.attr(default=1.0, type=float)
+    optimizer_type = zconf.attr(default="adam", type=str)
+    seed = zconf.attr(type=int, default=-1)
 
 
 @zconf.run_config
@@ -176,20 +182,39 @@ def run_loop(args: RunConfiguration, checkpoint=None):
                 os.path.join(args.output_dir, "model.p"),
             )
 
+        if args.do_train_eval:
+            train_eval_results_dict = runner.run_train_eval(
+                task_name_list=runner.jiant_task_container.task_run_config.train_task_list,
+                return_preds=args.write_train_preds,
+            )
+            jiant_evaluate.write_train_eval_results(
+                train_results_dict=train_eval_results_dict,
+                metrics_aggregator=runner.jiant_task_container.metrics_aggregator,
+                output_dir=args.output_dir,
+                verbose=True,
+            )
+            if args.write_train_preds:
+                jiant_evaluate.write_preds(
+                    eval_results_dict=train_eval_results_dict,
+                    path=os.path.join(args.output_dir, "train_preds.p"),
+                )
+        else:
+            assert not args.write_val_preds
+
         if args.do_val:
-            val_results_dict = runner.run_val(
+            train_eval_results_dict = runner.run_val(
                 task_name_list=runner.jiant_task_container.task_run_config.val_task_list,
                 return_preds=args.write_val_preds,
             )
             jiant_evaluate.write_val_results(
-                val_results_dict=val_results_dict,
+                val_results_dict=train_eval_results_dict,
                 metrics_aggregator=runner.jiant_task_container.metrics_aggregator,
                 output_dir=args.output_dir,
                 verbose=True,
             )
             if args.write_val_preds:
                 jiant_evaluate.write_preds(
-                    eval_results_dict=val_results_dict,
+                    eval_results_dict=train_eval_results_dict,
                     path=os.path.join(args.output_dir, "val_preds.p"),
                 )
         else:
@@ -199,6 +224,7 @@ def run_loop(args: RunConfiguration, checkpoint=None):
             test_results_dict = runner.run_test(
                 task_name_list=runner.jiant_task_container.task_run_config.test_task_list,
             )
+
             jiant_evaluate.write_preds(
                 eval_results_dict=test_results_dict,
                 path=os.path.join(args.output_dir, "test_preds.p"),

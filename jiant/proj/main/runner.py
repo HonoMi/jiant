@@ -124,19 +124,39 @@ class JiantRunner:
             },
         )
 
+    def run_train_eval(self, task_name_list, use_subset=None, return_preds=False, verbose=True):
+        dataloader_dict = self.get_train_dataloader_dict(for_eval=True)
+        labels_dict = self.get_train_labels_dict(
+            task_name_list=task_name_list, use_subset=use_subset
+        )
+        return self._run_eval(task_name_list, dataloader_dict, labels_dict,
+                              phase=PHASE.TRAIN, use_subset=use_subset, return_preds=return_preds)
+
     def run_val(self, task_name_list, use_subset=None, return_preds=False, verbose=True):
+        dataloader_dict = self.get_val_dataloader_dict(
+            task_name_list=task_name_list, use_subset=use_subset
+        )
+        labels_dict = self.get_val_labels_dict(
+            task_name_list=task_name_list, use_subset=use_subset
+        )
+        return self._run_eval(task_name_list, dataloader_dict, labels_dict,
+                              phase=PHASE.VAL, use_subset=use_subset, return_preds=return_preds)
+           
+    def _run_eval(self,
+                  task_name_list,
+                  dataloader_dict,
+                  labels_dict,
+                  phase=None,
+                  use_subset=None,
+                  return_preds=False,
+                  verbose=True):
         evaluate_dict = {}
-        val_dataloader_dict = self.get_val_dataloader_dict(
-            task_name_list=task_name_list, use_subset=use_subset
-        )
-        val_labels_dict = self.get_val_labels_dict(
-            task_name_list=task_name_list, use_subset=use_subset
-        )
         for task_name in task_name_list:
             task = self.jiant_task_container.task_dict[task_name]
             evaluate_dict[task_name] = run_val(
-                val_dataloader=val_dataloader_dict[task_name],
-                val_labels=val_labels_dict[task_name],
+                val_dataloader=dataloader_dict[task_name],
+                val_labels=labels_dict[task_name],
+                phase=phase,
                 jiant_model=self.jiant_model,
                 task=task,
                 device=self.device,
@@ -161,7 +181,7 @@ class JiantRunner:
             )
         return evaluate_dict
 
-    def get_train_dataloader_dict(self):
+    def get_train_dataloader_dict(self, for_eval=False, use_subset=False):
         # Not currently supported distributed parallel
         train_dataloader_dict = {}
         for task_name in self.jiant_task_container.task_run_config.train_task_list:
@@ -170,11 +190,20 @@ class JiantRunner:
             train_batch_size = self.jiant_task_container.task_specific_configs[
                 task_name
             ].train_batch_size
-            train_dataloader_dict[task_name] = InfiniteYield(
-                get_train_dataloader_from_cache(
-                    train_cache=train_cache, task=task, train_batch_size=train_batch_size,
+            if for_eval:
+                task_specific_config = self.jiant_task_container.task_specific_configs[task_name]
+                train_dataloader_dict[task_name] = get_eval_dataloader_from_cache(
+                    eval_cache=train_cache,
+                    task=task,
+                    eval_batch_size=task_specific_config.eval_batch_size,
+                    subset_num=task_specific_config.eval_subset_num if use_subset else None,
                 )
-            )
+            else:
+                train_dataloader_dict[task_name] = InfiniteYield(
+                    get_train_dataloader_from_cache(
+                        train_cache=train_cache, task=task, train_batch_size=train_batch_size,
+                    )
+                )
         return train_dataloader_dict
 
     def _get_eval_dataloader_dict(self, phase, task_name_list, use_subset=False):
@@ -196,16 +225,22 @@ class JiantRunner:
             phase="val", task_name_list=task_name_list, use_subset=use_subset,
         )
 
+    def get_train_labels_dict(self, task_name_list, use_subset=False):
+        return self._get_labels_dict(task_name_list, "train", use_subset=use_subset)
+
     def get_val_labels_dict(self, task_name_list, use_subset=False):
-        val_labels_dict = {}
+        return self._get_labels_dict(task_name_list, "val", use_subset=use_subset)
+
+    def _get_labels_dict(self, task_name_list, split: str, use_subset=False):
+        labels_dict = {}
         for task_name in task_name_list:
             task_specific_config = self.jiant_task_container.task_specific_configs[task_name]
-            val_labels_cache = self.jiant_task_container.task_cache_dict[task_name]["val_labels"]
-            val_labels = val_labels_cache.get_all()
+            labels_cache = self.jiant_task_container.task_cache_dict[task_name][f"{split}_labels"]
+            labels = labels_cache.get_all()
             if use_subset:
-                val_labels = val_labels[: task_specific_config.eval_subset_num]
-            val_labels_dict[task_name] = val_labels
-        return val_labels_dict
+                labels = labels[: task_specific_config.eval_subset_num]
+            labels_dict[task_name] = labels
+        return labels_dict
 
     def get_test_dataloader_dict(self):
         return self._get_eval_dataloader_dict(
@@ -258,7 +293,9 @@ def run_val(
     task,
     device,
     local_rank,
+    phase=None,
     return_preds=False,
+    return_logits=True,
     verbose=True,
 ):
     # Reminder:
@@ -273,7 +310,7 @@ def run_val(
     eval_accumulator = evaluation_scheme.get_accumulator()
 
     for step, (batch, batch_metadata) in enumerate(
-        maybe_tqdm(val_dataloader, desc=f"Eval ({task.name}, Val)", verbose=verbose)
+        maybe_tqdm(val_dataloader, desc=f"Eval ({task.name}, {str(phase)})", verbose=verbose)
     ):
         batch = batch.to(device)
 
@@ -310,6 +347,8 @@ def run_val(
         output["preds"] = evaluation_scheme.get_preds_from_accumulator(
             task=task, accumulator=eval_accumulator,
         )
+        if isinstance(eval_accumulator, evaluate.ConcatenateLogitsAccumulator) and return_logits:
+            output["logits"] = eval_accumulator.get_accumulated()
     return output
 
 
@@ -321,6 +360,7 @@ def run_test(
     local_rank,
     verbose=True,
     return_preds=True,
+    return_logits=True,
 ):
     if not local_rank == -1:
         return
@@ -348,4 +388,6 @@ def run_test(
         output["preds"] = evaluation_scheme.get_preds_from_accumulator(
             task=task, accumulator=eval_accumulator,
         )
+        if isinstance(eval_accumulator, evaluate.ConcatenateLogitsAccumulator) and return_logits:
+            output["logits"] = eval_accumulator.get_accumulated()
     return output

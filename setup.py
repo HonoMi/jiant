@@ -72,6 +72,7 @@ setup(
         "tqdm == 4.46.0",
         "transformers == 3.0.2",
         "torchvision == 0.6.0",
+        "machine_learning@git+https://github.com/HonoMi/machine-learning.git@master",
     ],
     extras_require=extras,
     python_requires=">=3.6.0",

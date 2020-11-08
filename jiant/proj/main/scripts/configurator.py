@@ -120,11 +120,13 @@ class SingleTaskConfigurator(zconf.RunConfig):
         task_cache_config = {}
         if self.do_train:
             task_cache_config["train"] = os.path.join(task_cache_path, "train")
+            task_cache_config["train_labels"] = os.path.join(task_cache_path, "train_labels")
         if self.do_val:
             task_cache_config["val"] = os.path.join(task_cache_path, "val")
             task_cache_config["val_labels"] = os.path.join(task_cache_path, "val_labels")
         if self.do_test:
             task_cache_config["test"] = os.path.join(task_cache_path, "test")
+            task_cache_config["test_labels"] = os.path.join(task_cache_path, "test_labels")
         for v in task_cache_config.values():
             assert os.path.exists(v)
 
@@ -318,6 +320,9 @@ class SimpleAPIMultiTaskConfigurator(zconf.RunConfig):
                     task_cache_config_dict[task_name]["train"] = os.path.join(
                         self.task_cache_base_path, task_name, "train",
                     )
+                    task_cache_config_dict[task_name]["train_labels"] = os.path.join(
+                        self.task_cache_base_path, task_name, "train_labels",
+                    )
                 if (
                     task_name in task_name_list_dict["train_val"]
                     or task_name in task_name_list_dict["val"]
@@ -332,6 +337,11 @@ class SimpleAPIMultiTaskConfigurator(zconf.RunConfig):
                     task_cache_config_dict[task_name]["test"] = os.path.join(
                         self.task_cache_base_path, task_name, "test",
                     )
+                    labels_path = os.path.join(
+                        self.task_cache_base_path, task_name, "test_labels",
+                    )
+                    if os.path.exists(labels_path):
+                        task_cache_config_dict[task_name]["test_labels"] = labels_path
         elif isinstance(self.task_cache_config_dict, str):
             assert self.task_cache_base_path is None
             task_cache_config_dict = py_io.read_json(self.task_cache_config_dict)

@@ -158,53 +158,47 @@ def main(args: RunConfiguration):
     paths_dict = {}
     os.makedirs(args.output_dir, exist_ok=True)
 
-    if PHASE.TRAIN in phases:
-        chunk_and_save(
-            task=task,
-            phase=PHASE.TRAIN,
-            examples=task.get_train_examples(),
-            feat_spec=feat_spec,
-            tokenizer=tokenizer,
-            args=args,
-        )
-        paths_dict["train"] = os.path.join(args.output_dir, PHASE.TRAIN)
-
-    if PHASE.VAL in phases:
-        val_examples = task.get_val_examples()
-        chunk_and_save(
-            task=task,
-            phase=PHASE.VAL,
-            examples=val_examples,
-            feat_spec=feat_spec,
-            tokenizer=tokenizer,
-            args=args,
-        )
+    def do_tokenize(phase: str):
         evaluation_scheme = evaluate.get_evaluation_scheme_for_task(task)
+        output_dir = os.path.join(args.output_dir, f"{phase}")
+        labels_output_dir = os.path.join(args.output_dir, f"{phase}_labels")
+        if phase == PHASE.TRAIN:
+            get_examples_func = task.get_train_examples
+        elif phase == PHASE.VAL:
+            get_examples_func = task.get_val_examples
+        elif phase == PHASE.TEST:
+            get_examples_func = task.get_test_examples
+
+        chunk_and_save(
+            task=task,
+            phase=phase,
+            examples=get_examples_func(),
+            feat_spec=feat_spec,
+            tokenizer=tokenizer,
+            args=args,
+        )
+        paths_dict[phase] = output_dir
+
         shared_caching.chunk_and_save(
             data=evaluation_scheme.get_labels_from_cache_and_examples(
                 task=task,
-                cache=shared_caching.ChunkedFilesDataCache(
-                    os.path.join(args.output_dir, PHASE.VAL)
-                ),
-                examples=val_examples,
+                cache=shared_caching.ChunkedFilesDataCache(output_dir),
+                examples=get_examples_func(),
             ),
             chunk_size=args.chunk_size,
             data_args=args.to_dict(),
-            output_dir=os.path.join(args.output_dir, "val_labels"),
+            output_dir=labels_output_dir,
         )
-        paths_dict[PHASE.VAL] = os.path.join(args.output_dir, PHASE.VAL)
-        paths_dict["val_labels"] = os.path.join(args.output_dir, "val_labels")
+        paths_dict[f"{phase}_labels"] = labels_output_dir
+
+    if PHASE.TRAIN in phases:
+        do_tokenize(PHASE.TRAIN)
+        
+    if PHASE.VAL in phases:
+        do_tokenize(PHASE.VAL)
 
     if PHASE.TEST in phases:
-        chunk_and_save(
-            task=task,
-            phase=PHASE.TEST,
-            examples=task.get_test_examples(),
-            feat_spec=feat_spec,
-            tokenizer=tokenizer,
-            args=args,
-        )
-        paths_dict[PHASE.TEST] = os.path.join(args.output_dir, PHASE.TEST)
+        do_tokenize(PHASE.TEST)
 
     if not args.skip_write_output_paths:
         py_io.write_json(data=paths_dict, path=os.path.join(args.output_dir, "paths.json"))
