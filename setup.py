@@ -73,6 +73,7 @@ setup(
         "transformers == 3.0.2",
         "torchvision == 0.6.0",
         "machine_learning@git+https://github.com/HonoMi/machine-learning.git@master",
+        "torchsampler@https://github.com/HonoMi/torchsampler.git@master",
     ],
     extras_require=extras,
     python_requires=">=3.6.0",

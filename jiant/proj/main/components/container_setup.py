@@ -15,6 +15,7 @@ class TaskSpecificConfig(ExtendedDataClassMixin):
     eval_batch_size: int
     gradient_accumulation_steps: int
     eval_subset_num: int
+    train_sample_weights: str
 
 
 @dataclass

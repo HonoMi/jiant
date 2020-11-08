@@ -125,7 +125,7 @@ class JiantRunner:
         )
 
     def run_train_eval(self, task_name_list, use_subset=None, return_preds=False, verbose=True):
-        dataloader_dict = self.get_train_dataloader_dict(for_eval=True)
+        dataloader_dict = self.get_train_dataloader_dict(for_eval=True,)
         labels_dict = self.get_train_labels_dict(
             task_name_list=task_name_list, use_subset=use_subset
         )
@@ -196,11 +196,8 @@ class JiantRunner:
         for task_name in self.jiant_task_container.task_run_config.train_task_list:
             task = self.jiant_task_container.task_dict[task_name]
             train_cache = self.jiant_task_container.task_cache_dict[task_name]["train"]
-            train_batch_size = self.jiant_task_container.task_specific_configs[
-                task_name
-            ].train_batch_size
+            task_specific_config = self.jiant_task_container.task_specific_configs[task_name]
             if for_eval:
-                task_specific_config = self.jiant_task_container.task_specific_configs[task_name]
                 train_dataloader_dict[task_name] = get_eval_dataloader_from_cache(
                     eval_cache=train_cache,
                     task=task,
@@ -210,8 +207,10 @@ class JiantRunner:
             else:
                 train_dataloader_dict[task_name] = InfiniteYield(
                     get_train_dataloader_from_cache(
-                        train_cache=train_cache, task=task, train_batch_size=train_batch_size,
-                    )
+                        train_cache=train_cache, task=task, train_batch_size=task_specific_config.train_batch_size,
+                        sample_weights=task_specific_config.train_sample_weights,
+                        shuffle=True if task_specific_config.train_sample_weights is None else False
+                    ),
                 )
         return train_dataloader_dict
 

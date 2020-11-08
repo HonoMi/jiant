@@ -90,6 +90,7 @@ class SingleTaskConfigurator(zconf.RunConfig):
     eval_batch_size = zconf.attr(type=int, default=None)
     gradient_accumulation_steps = zconf.attr(type=int, default=1)
     eval_subset_num = zconf.attr(type=int, default=500)
+    train_sample_weights = zconf.attr(type=str, default=None)
     epochs = zconf.attr(type=int, default=None)
     max_steps = zconf.attr(type=int, default=None)
     num_gpus = zconf.attr(type=int, default=None)
@@ -179,6 +180,7 @@ class SingleTaskConfigurator(zconf.RunConfig):
                     "eval_batch_size": eval_batch_size,
                     "gradient_accumulation_steps": self.gradient_accumulation_steps,
                     "eval_subset_num": self.eval_subset_num,
+                    "train_sample_weights": self.train_sample_weights,
                 }
             },
             "taskmodels_config": {
@@ -252,6 +254,7 @@ class SimpleAPIMultiTaskConfigurator(zconf.RunConfig):
     eval_batch_size = zconf.attr(type=int, default=None)
     gradient_accumulation_steps = zconf.attr(type=int, default=1)
     eval_subset_num = zconf.attr(type=int, default=500)
+    train_sample_weights = zconf.attr(type=str, default=None)
     epochs = zconf.attr(type=int, default=None)
     max_steps = zconf.attr(type=int, default=None)
     num_gpus = zconf.attr(type=int, default=None)
@@ -425,6 +428,7 @@ class SimpleAPIMultiTaskConfigurator(zconf.RunConfig):
                     "eval_batch_size": eval_batch_size,
                     "gradient_accumulation_steps": self.gradient_accumulation_steps,
                     "eval_subset_num": self.eval_subset_num,
+                    "train_sample_weights": self.train_sample_weights,
                 }
                 for task_name in full_task_name_list
             },
