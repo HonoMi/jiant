@@ -74,6 +74,7 @@ setup(
         "torchvision == 0.6.0",
         "machine_learning@git+https://github.com/HonoMi/machine-learning.git@master",
         "torchsampler@https://github.com/HonoMi/torchsampler.git@master",
+        "datasets_extra@https://github.com/HonoMi/datasets-extra.git@master",
     ],
     extras_require=extras,
     python_requires=">=3.6.0",

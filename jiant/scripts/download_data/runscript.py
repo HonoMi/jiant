@@ -13,6 +13,7 @@ from jiant.tasks.constants import (
     BENCHMARKS,
 )
 from jiant.scripts.download_data.constants import SQUAD_TASKS, DIRECT_DOWNLOAD_TASKS
+from jiant.scripts.download_data.cross_validation import parse_cv_task_name
 
 # DIRECT_DOWNLOAD_TASKS need to be directly downloaded because the HF Datasets
 # implementation differs from the original dataset format
@@ -44,33 +45,44 @@ def download_data(task_names, output_base_path):
     task_data_base_path = py_io.create_dir(output_base_path, "data")
     task_config_base_path = py_io.create_dir(output_base_path, "configs")
 
-    assert set(task_names).issubset(SUPPORTED_TASKS)
+    # assert set(task_names).issubset(SUPPORTED_TASKS)
+    task_names_with_cv = task_names
 
     # Download specified tasks and generate configs for specified tasks
-    for i, task_name in enumerate(task_names):
-        task_data_path = os.path.join(task_data_base_path, task_name)
+    for i, cv_task_name in enumerate(task_names_with_cv):
+        task_name, n_fold, fold = parse_cv_task_name(cv_task_name)
+
+        assert(task_name in SUPPORTED_TASKS)
+
+        task_data_path = os.path.join(task_data_base_path, cv_task_name)
 
         if task_name in HF_DATASETS_TASKS:
             hf_datasets_tasks_download.download_data_and_write_config(
-                task_name=task_name,
-                task_data_path=task_data_path,
-                task_config_path=os.path.join(task_config_base_path, f"{task_name}_config.json"),
+                task_name = task_name,
+                task_data_path = task_data_path,
+                task_config_path = os.path.join(task_config_base_path, f"{cv_task_name}_config.json"),
+                n_fold=n_fold,
+                fold=fold,
             )
         elif task_name in XTREME_TASKS:
+            if n_fold is not None:
+                raise NotImplementedError()
             xtreme_download.download_xtreme_data_and_write_config(
                 task_name=task_name,
                 task_data_base_path=task_data_base_path,
                 task_config_base_path=task_config_base_path,
             )
         elif task_name in DIRECT_DOWNLOAD_TASKS:
+            if n_fold is not None:
+                raise NotImplementedError()
             files_tasks_download.download_task_data_and_write_config(
                 task_name=task_name,
                 task_data_path=task_data_path,
-                task_config_path=os.path.join(task_config_base_path, f"{task_name}_config.json"),
+                task_config_path=os.path.join(task_config_base_path, f"{cv_task_name}_config.json"),
             )
         else:
             raise KeyError()
-        print(f"Downloaded and generated configs for '{task_name}' ({i+1}/{len(task_names)})")
+        print(f"Downloaded and generated configs for '{cv_task_name}' ({i+1}/{len(task_names)})")
 
 
 def main():

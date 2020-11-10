@@ -11,7 +11,7 @@ import jiant.shared.caching as caching
 import jiant.utils.python.io as py_io
 import jiant.utils.torch_utils as torch_utils
 
-from torchsampler import WeightedDatsetSampler
+from torchsampler import WeightedDatasetSampler
 
 logger = logging.getLogger(__name__)
 
@@ -56,7 +56,7 @@ def get_train_dataloader_from_cache(
     if sample_weights is not None:
 
         _sample_weights = pd.read_csv(sample_weights, sep='\t', header=None)[0]
-        sampler = WeightedDatsetSampler(dataset, _sample_weights)
+        sampler = WeightedDatasetSampler(dataset, _sample_weights)
         if shuffle:
             logger.warning('shuffle=True can\'t be used with sample weights. It will be set as False')
         shuffle = False

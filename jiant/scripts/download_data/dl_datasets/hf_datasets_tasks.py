@@ -1,4 +1,5 @@
 """Use this for tasks that can be obtained from HF-Datasets without further/special processing"""
+import re
 
 import jiant.scripts.download_data.utils as download_utils
 import jiant.utils.python.io as py_io
@@ -19,6 +20,7 @@ from jiant.tasks.retrieval import (
     SuperglueWinogenderDiagnosticsTask,
     GlueDiagnosticsTask,
 )
+from jiant.scripts.download_data.cross_validation import build_cv_task_name
 
 
 HF_DATASETS_CONVERSION_DICT = {
@@ -169,7 +171,9 @@ HF_DATASETS_CONVERSION_DICT = {
 DEFAULT_PHASE_MAP = {"validation": "val"}
 
 
-def download_data_and_write_config(task_name: str, task_data_path: str, task_config_path: str):
+def download_data_and_write_config(task_name: str, task_data_path: str, task_config_path: str, n_fold: int = None, fold: int = None):
+    cv_task_name = build_cv_task_name(task_name, n_fold, fold)
+
     hf_datasets_conversion_metadata = HF_DATASETS_CONVERSION_DICT[task_name]
     examples_dict = download_utils.convert_hf_dataset_to_examples(
         path=hf_datasets_conversion_metadata["path"],
@@ -178,12 +182,15 @@ def download_data_and_write_config(task_name: str, task_data_path: str, task_con
         label_map=hf_datasets_conversion_metadata.get("label_map"),
         phase_map=hf_datasets_conversion_metadata.get("phase_map", DEFAULT_PHASE_MAP),
         phase_list=hf_datasets_conversion_metadata.get("phase_list"),
+        n_fold=n_fold,
+        fold=fold,
     )
     paths_dict = download_utils.write_examples_to_jsonls(
         examples_dict=examples_dict, task_data_path=task_data_path,
     )
     jiant_task_name = hf_datasets_conversion_metadata.get("jiant_task_name", task_name)
+    cv_jiant_task_name = build_cv_task_name(jiant_task_name, n_fold, fold)
     py_io.write_json(
-        data={"task": jiant_task_name, "paths": paths_dict, "name": task_name},
+        data={"task": cv_jiant_task_name, "paths": paths_dict, "name": cv_task_name},
         path=task_config_path,
     )
