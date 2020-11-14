@@ -145,10 +145,14 @@ TASK_DICT = {
 
 
 def get_task_class(task_name: str):
-    task_class = None
-    for reference_task_name, cls in TASK_DICT.items():
-        if is_task(task_name, reference_task_name):
-            task_class = TASK_DICT[reference_task_name]
+    task_class = TASK_DICT.get(task_name, None)
+
+    if task_class is None:
+        for reference_task_name, cls in TASK_DICT.items():
+            if is_task(task_name, reference_task_name):
+                task_class = TASK_DICT[reference_task_name]
+                break
+
     if task_class is None:
         raise ValueError(f'Unknown task_name="{task_name}"')
     assert issubclass(task_class, Task)

@@ -89,6 +89,13 @@ class MrpcTask(GlueMixin, Task):
     def get_test_examples(self):
         return self._create_examples(lines=read_jsonl(self.test_path), set_type="test")
 
+    def _get_test_labels(self):
+        labels = [example.label
+                  for example in self._create_examples(lines=read_jsonl(self.test_path), set_type="valid")]
+        if any([label not in self.LABELS for label in labels]):  # masked labels
+            labels = [self.LABELS[-1]] * len(labels)
+        return labels
+
     @classmethod
     def _create_examples(cls, lines, set_type):
         examples = []

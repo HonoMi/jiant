@@ -175,6 +175,38 @@ class Task:
         else:
             raise TypeError(f"Unknown type for collate_fn {type(elem)}")
 
+    def get_examples(self,
+                     set_type: str):
+        """ラベル付きのデータセットを返すための統一API
+
+        子クラスの，get_test_examples()がラベルを返さないことから，必要となる．
+        """
+
+        if set_type == 'train':
+            return self.get_train_examples()
+        elif set_type == 'val':
+            return self.get_val_examples()
+        elif set_type == 'test':
+            examples  = self.get_test_examples()
+            labels = self._get_test_labels()
+            for example, label in zip(examples, labels):
+                example.label = label
+            return examples
+        else:
+            raise ValueError('Unknown set_type "{set_type}".')
+
+    def get_train_examples(self):
+        raise NotImplementedError()
+
+    def get_val_examples(self):
+        raise NotImplementedError()
+
+    def get_test_examples(self):
+        raise NotImplementedError()
+
+    def _get_test_labels(self):
+        raise NotImplementedError()
+
 
 class SuperGlueMixin:
     """Mixin for :class:`jiant.tasks.core.Task`s in the `SuperGLUE<https://super.gluebenchmark.com/>`_

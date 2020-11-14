@@ -9,6 +9,45 @@ from jiant.utils.python.datastructures import replace_key
 from datasets_extra.processing import get_cv_splits
 
 
+def load_hf_dataset(path,
+                    name=None,
+                    version=None,
+                    phase_map=None,
+                    n_fold: int = None,
+                    fold: int = None,
+                    split_type: str = None):
+    phase_map = phase_map or {}
+    split_type = split_type or 'local_evaluation'
+
+    dataset = datasets.load_dataset(path=path, name=name, version=version)
+
+    for old_phase_name, new_phase_name in phase_map.items():
+        replace_key(dataset, old_key=old_phase_name, new_key=new_phase_name)
+
+    if n_fold is not None:
+        jiant2hf_phase_map = {val: key for key, val in phase_map.items()}
+        hf_train_phase = jiant2hf_phase_map.get('train', 'train')
+        hf_val_phase = jiant2hf_phase_map.get('val', 'val')
+
+        if split_type == 'local_evaluation':
+            hf_local_phase = '+'.join([hf_train_phase])
+            dataset['test'] = dataset['val']
+        elif split_type == 'submission':
+            hf_local_phase = '+'.join([hf_train_phase, hf_val_phase])
+        else:
+            raise ValueError(f'Unknown split type "{split_type}"')
+
+        hf_local_dataset = datasets.load_dataset(path=path,
+                                                 name=name,
+                                                 version=version,
+                                                 split=hf_local_phase)
+        cv_dataset = get_cv_splits(hf_local_dataset, n_fold, stratify=False)
+        dataset['train'] = cv_dataset[f'cv-{fold}.train']
+        dataset['val'] = cv_dataset[f'cv-{fold}.val']
+
+    return dataset
+
+
 def convert_hf_dataset_to_examples(
     path, name=None, version=None, field_map=None, label_map=None, phase_map=None, phase_list=None,
     n_fold: int = None, fold: int = None,
@@ -28,18 +67,13 @@ def convert_hf_dataset_to_examples(
         Dict[phase] -> list[examples]
     """
     # "mrpc.cv-5-0"
-    dataset = datasets.load_dataset(path=path, name=name, version=version)
+    dataset = load_hf_dataset(path=path,
+                              name=name,
+                              version=version,
+                              phase_map=phase_map,
+                              n_fold=n_fold,
+                              fold=fold)
 
-    if phase_map:
-        for old_phase_name, new_phase_name in phase_map.items():
-            replace_key(dataset, old_key=old_phase_name, new_key=new_phase_name)
-    if n_fold is not None:
-        cv_dataset = get_cv_splits(dataset['train'], n_fold, stratify=False)
-        cv_train = cv_dataset[f'cv-{fold}.train']
-        cv_val = cv_dataset[f'cv-{fold}.val']
-        dataset['test'] = dataset['val']
-        dataset['val'] = cv_val
-        dataset['train'] = cv_train
     if phase_list is None:
         phase_list = dataset.keys()
     examples_dict = {}

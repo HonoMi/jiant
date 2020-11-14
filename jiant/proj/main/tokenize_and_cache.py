@@ -1,4 +1,5 @@
 import os
+import logging
 
 import jiant.proj.main.preprocessing as preprocessing
 import jiant.shared.caching as shared_caching
@@ -9,6 +10,8 @@ import jiant.tasks.evaluate as evaluate
 import jiant.utils.zconf as zconf
 import jiant.utils.python.io as py_io
 from jiant.shared.constants import PHASE
+
+logger = logging.getLogger(__name__)
 
 
 @zconf.run_config
@@ -83,6 +86,8 @@ def full_chunk_and_save(task, phase, examples, feat_spec, tokenizer, args: RunCo
         phase=phase,
         verbose=True,
     )
+    if phase == 'test':
+        labels = [data['data_row'].label_id for data in dataset]  # HONOKA
     if args.smart_truncate:
         dataset, length = preprocessing.smart_truncate(
             dataset=dataset, max_seq_length=args.max_seq_length, verbose=True,
@@ -167,9 +172,16 @@ def main(args: RunConfiguration):
         elif phase == PHASE.VAL:
             get_examples_func = task.get_val_examples
         elif phase == PHASE.TEST:
-            get_examples_func = task.get_test_examples
+            # get_examples_func = task.get_test_examples
 
-        chunk_and_save(
+            def get_examples_func():
+                try:
+                    return task.get_examples('test')
+                except NotImplementedError:
+                    logger.warning('The labels for "test" split is not retrieved, so, metrics for the "test" split will not be evaluated properly.')
+                return task.get_test_examples()
+
+        chunk_and_save(  # HONOKA
             task=task,
             phase=phase,
             examples=get_examples_func(),
