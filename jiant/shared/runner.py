@@ -24,6 +24,9 @@ class _ListDataset(Dataset):
         return self._elems[index]
         raise NotImplementedError
 
+    def __len__(self):
+        return len(self._elems)
+
 
 def complex_backpropagate(
     loss, optimizer, model, fp16, n_gpu, gradient_accumulation_steps, max_grad_norm
@@ -46,27 +49,23 @@ def complex_backpropagate(
 
 
 def get_train_dataloader_from_cache(
-    train_cache: caching.ChunkedFilesDataCache, task, train_batch_size: int, shuffle=True,
+    train_cache: caching.ChunkedFilesDataCache, task, train_batch_size: int,
     sample_weights=None,
 ):
     # TODO: Expose buffer_size parameter  (issue #1183)
 
-    dataset = train_cache.get_iterable_dataset(buffer_size=10000, shuffle=shuffle)
-
     if sample_weights is not None:
-
+        dataset = train_cache.get_iterable_dataset(buffer_size=10000, shuffle=False)
+        dataset = _ListDataset([elem for elem in dataset])
         _sample_weights = pd.read_csv(sample_weights, sep='\t', header=None)[0]
         sampler = WeightedDatasetSampler(dataset, _sample_weights)
-        if shuffle:
-            logger.warning('shuffle=True can\'t be used with sample weights. It will be set as False')
-        shuffle = False
-        dataset = _ListDataset([elem for elem in dataset])
     else:
+        dataset = train_cache.get_iterable_dataset(buffer_size=10000, shuffle=True)
         sampler = None
 
     train_dataloader = torch_utils.DataLoaderWithLength(
         dataset=dataset, batch_size=train_batch_size, collate_fn=task.collate_fn,
-        sampler=sampler, shuffle=shuffle,
+        sampler=sampler
     )
     return train_dataloader
 

@@ -86,7 +86,7 @@ def update_parser(parser, class_with_attributes: Any):
             parser.add_argument(argparse_arg_name, *opt_string_ls, **argparse_kwargs)
 
 
-def read_parser(parser, class_with_attributes: Any, skip_non_class_attributes=None, args=None):
+def read_parser_opts(parser, class_with_attributes: Any, skip_non_class_attributes=None, args=None):
     attribute_name_set = {attribute.name for attribute in class_with_attributes.__attrs_attrs__}
 
     kwargs = dict()
@@ -99,6 +99,14 @@ def read_parser(parser, class_with_attributes: Any, skip_non_class_attributes=No
             if skip_non_class_attributes is not None and k not in skip_non_class_attributes:
                 raise RuntimeError(f"Unknown attribute {k}")
             leftover_kwargs[k] = v
+    return kwargs, leftover_kwargs
+
+
+def read_parser(parser, class_with_attributes: Any, skip_non_class_attributes=None, args=None):
+    kwargs, leftover_kwargs = read_parser_opts(parser=parser,
+                                               class_with_attributes=class_with_attributes,
+                                               skip_non_class_attributes=skip_non_class_attributes,
+                                               args=args)
 
     instance = class_with_attributes(**kwargs)
     if skip_non_class_attributes:

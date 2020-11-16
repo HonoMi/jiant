@@ -209,7 +209,6 @@ class JiantRunner:
                     get_train_dataloader_from_cache(
                         train_cache=train_cache, task=task, train_batch_size=task_specific_config.train_batch_size,
                         sample_weights=task_specific_config.train_sample_weights,
-                        shuffle=True if task_specific_config.train_sample_weights is None else False
                     ),
                 )
         return train_dataloader_dict
