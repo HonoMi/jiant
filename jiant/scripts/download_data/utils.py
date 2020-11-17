@@ -51,6 +51,7 @@ def load_hf_dataset(path,
 def convert_hf_dataset_to_examples(
     path, name=None, version=None, field_map=None, label_map=None, phase_map=None, phase_list=None,
     n_fold: int = None, fold: int = None,
+    return_hf_dataset=False,
 ):
     """Helper function for reading from datasets.load_dataset and converting to examples
 
@@ -96,7 +97,11 @@ def convert_hf_dataset_to_examples(
                 raw_example["label"] = label
             phase_examples.append(raw_example)
         examples_dict[phase] = phase_examples
-    return examples_dict
+
+    if return_hf_dataset:
+        return examples_dict, dataset
+    else:
+        return examples_dict
 
 
 def write_examples_to_jsonls(examples_dict, task_data_path):

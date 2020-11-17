@@ -171,11 +171,9 @@ HF_DATASETS_CONVERSION_DICT = {
 DEFAULT_PHASE_MAP = {"validation": "val"}
 
 
-def download_data_and_write_config(task_name: str, task_data_path: str, task_config_path: str, n_fold: int = None, fold: int = None):
-    cv_task_name = build_cv_task_name(task_name, n_fold, fold)
-
+def build_examples(task_name, n_fold: int = None, fold: int = None, return_hf_dataset=False):
     hf_datasets_conversion_metadata = HF_DATASETS_CONVERSION_DICT[task_name]
-    examples_dict = download_utils.convert_hf_dataset_to_examples(
+    ret = download_utils.convert_hf_dataset_to_examples(
         path=hf_datasets_conversion_metadata["path"],
         name=hf_datasets_conversion_metadata.get("name"),
         field_map=hf_datasets_conversion_metadata.get("field_map"),
@@ -184,12 +182,20 @@ def download_data_and_write_config(task_name: str, task_data_path: str, task_con
         phase_list=hf_datasets_conversion_metadata.get("phase_list"),
         n_fold=n_fold,
         fold=fold,
+        return_hf_dataset=return_hf_dataset,
     )
+    return ret
+
+
+def download_data_and_write_config(task_name: str, task_data_path: str, task_config_path: str, n_fold: int = None, fold: int = None):
+    examples_dict = build_examples(task_name, n_fold=n_fold, fold=fold)
     paths_dict = download_utils.write_examples_to_jsonls(
         examples_dict=examples_dict, task_data_path=task_data_path,
     )
-    jiant_task_name = hf_datasets_conversion_metadata.get("jiant_task_name", task_name)
+    jiant_task_name = HF_DATASETS_CONVERSION_DICT[task_name].get("jiant_task_name", task_name)
     cv_jiant_task_name = build_cv_task_name(jiant_task_name, n_fold, fold)
+
+    cv_task_name = build_cv_task_name(task_name, n_fold, fold)
     py_io.write_json(
         data={"task": cv_jiant_task_name, "paths": paths_dict, "name": cv_task_name},
         path=task_config_path,
