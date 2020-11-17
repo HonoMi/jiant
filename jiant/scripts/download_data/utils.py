@@ -52,6 +52,7 @@ def convert_hf_dataset_to_examples(
     path, name=None, version=None, field_map=None, label_map=None, phase_map=None, phase_list=None,
     n_fold: int = None, fold: int = None,
     return_hf_dataset=False,
+    return_hf_metric=False,
 ):
     """Helper function for reading from datasets.load_dataset and converting to examples
 
@@ -74,6 +75,7 @@ def convert_hf_dataset_to_examples(
                               phase_map=phase_map,
                               n_fold=n_fold,
                               fold=fold)
+    metric = datasets.load_metric(path, config_name=name)
 
     if phase_list is None:
         phase_list = dataset.keys()
@@ -98,10 +100,15 @@ def convert_hf_dataset_to_examples(
             phase_examples.append(raw_example)
         examples_dict[phase] = phase_examples
 
-    if return_hf_dataset:
-        return examples_dict, dataset
-    else:
+    if not return_hf_dataset and not return_hf_metric:
         return examples_dict
+
+    ret = [examples_dict]
+    if return_hf_dataset:
+        ret.append(dataset)
+    if return_hf_metric:
+        ret.append(metric)
+    return ret
 
 
 def write_examples_to_jsonls(examples_dict, task_data_path):

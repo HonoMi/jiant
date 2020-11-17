@@ -171,7 +171,7 @@ HF_DATASETS_CONVERSION_DICT = {
 DEFAULT_PHASE_MAP = {"validation": "val"}
 
 
-def build_examples(task_name, n_fold: int = None, fold: int = None, return_hf_dataset=False):
+def build_examples(task_name, n_fold: int = None, fold: int = None, return_hf_dataset=False, return_hf_metric=False):
     hf_datasets_conversion_metadata = HF_DATASETS_CONVERSION_DICT[task_name]
     ret = download_utils.convert_hf_dataset_to_examples(
         path=hf_datasets_conversion_metadata["path"],
@@ -183,6 +183,7 @@ def build_examples(task_name, n_fold: int = None, fold: int = None, return_hf_da
         n_fold=n_fold,
         fold=fold,
         return_hf_dataset=return_hf_dataset,
+        return_hf_metric=return_hf_metric,
     )
     return ret
 
