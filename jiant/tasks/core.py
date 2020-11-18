@@ -2,6 +2,7 @@ import numpy as np
 from typing import NamedTuple, Mapping, Dict
 from enum import Enum
 from dataclasses import dataclass
+from jiant.utils.python.io import read_jsonl
 
 import torch
 import torch.utils.data.dataloader as dataloader
@@ -206,6 +207,19 @@ class Task:
 
     def _get_test_labels(self):
         raise NotImplementedError()
+
+
+def default_get_test_labels(default_task: Task):
+    """test setのラベルを獲得する．
+
+    Taskのサブクラスで`_get_test_labels`を実装する際に利用せよ(参考: jiant/tasks/lib/mrpc.py)．
+    本関数が動作するかどうかは，サブクラスの実装による．
+    """
+    labels = [example.label
+              for example in default_task._create_examples(lines=read_jsonl(default_task.test_path), set_type="valid")]
+    if any([label not in default_task.LABELS for label in labels]):  # masked labels
+        labels = [default_task.LABELS[-1]] * len(labels)
+    return labels
 
 
 class SuperGlueMixin:

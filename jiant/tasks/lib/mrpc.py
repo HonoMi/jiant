@@ -14,6 +14,7 @@ from jiant.tasks.core import (
 )
 from jiant.tasks.lib.templates.shared import double_sentence_featurize, labels_to_bimap
 from jiant.utils.python.io import read_jsonl
+from jiant.tasks.core import default_get_test_labels
 
 
 @dataclass
@@ -90,11 +91,7 @@ class MrpcTask(GlueMixin, Task):
         return self._create_examples(lines=read_jsonl(self.test_path), set_type="test")
 
     def _get_test_labels(self):
-        labels = [example.label
-                  for example in self._create_examples(lines=read_jsonl(self.test_path), set_type="valid")]
-        if any([label not in self.LABELS for label in labels]):  # masked labels
-            labels = [self.LABELS[-1]] * len(labels)
-        return labels
+        return default_get_test_labels(self)
 
     @classmethod
     def _create_examples(cls, lines, set_type):
