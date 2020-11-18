@@ -22,6 +22,7 @@ from jiant.tasks.utils import truncate_sequences, ExclusiveSpan
 from jiant.utils.python.io import read_json_lines
 from jiant.utils import retokenize
 from jiant.utils.tokenization_normalization import normalize_tokenizations
+from jiant.tasks.core import default_get_test_labels
 
 
 @dataclass
@@ -238,6 +239,9 @@ class WiCTask(SuperGlueMixin, Task):
 
     def get_test_examples(self):
         return self._create_examples(lines=read_json_lines(self.test_path), set_type="test")
+
+    def _get_test_labels(self):
+        return default_get_test_labels(self)
 
     @classmethod
     def _create_examples(cls, lines, set_type):

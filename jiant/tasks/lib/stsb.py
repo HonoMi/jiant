@@ -17,6 +17,7 @@ from jiant.tasks.lib.templates.shared import (
     create_input_set_from_tokens_and_segments,
 )
 from jiant.utils.python.io import read_jsonl
+from jiant.tasks.core import default_get_test_labels
 
 
 @dataclass
@@ -101,6 +102,9 @@ class StsbTask(GlueMixin, Task):
 
     def get_test_examples(self):
         return self._create_examples(lines=read_jsonl(self.test_path), set_type="test")
+
+    def _get_test_labels(self):
+        return default_get_test_labels(self)
 
     @classmethod
     def _create_examples(cls, lines, set_type):
