@@ -39,11 +39,11 @@ class ModelArchitectures(Enum):
             return cls.GLOVE_LSTM
         elif model_type.startswith("xlm-roberta-"):
             return cls.XLM_ROBERTA
-        elif model_type.startswith("bart-"):
+        elif model_type.startswith("facebook/bart-"):
             return cls.BART
-        elif model_type.startswith("mbart-"):
+        elif model_type.startswith("facebook/mbart-"):
             return cls.MBART
-        elif model_type.startswith("electra-"):
+        elif model_type.startswith("google/electra-"):
             return cls.ELECTRA
         else:
             raise KeyError(model_type)

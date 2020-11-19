@@ -58,6 +58,7 @@ def export_model(
     model_path = os.path.join(model_fol_path, f"{model_type}.p")
     model_config_path = os.path.join(model_fol_path, f"{model_type}.json")
     model = model_class.from_pretrained(hf_model_name)
+    os.makedirs(os.path.dirname(model_path), exist_ok=True)  # Necessary since some models are named "facebook/bart-base"
     torch.save(model.state_dict(), model_path)
     py_io.write_json(model.config.to_dict(), model_config_path)
     tokenizer = tokenizer_class.from_pretrained(hf_model_name)
@@ -76,13 +77,19 @@ def get_model_and_tokenizer_classes(
 ) -> Tuple[Type[transformers.PreTrainedModel], Type[transformers.PreTrainedTokenizer]]:
     # We want the chosen model to have all the weights from pretraining (if possible)
     class_lookup = {
+        # HONOKA: 学習済みweightの上に，何らかの層があればよい．
+        # 生成モデル以外は，ForPreTraining -> ForMaskedLM -> LMHeadModel の順に，存在するクラスを使っているようにみえる．
         "bert": (transformers.BertForPreTraining, transformers.BertTokenizer),
         "xlm-clm-": (transformers.XLMWithLMHeadModel, transformers.XLMTokenizer),
         "roberta": (transformers.RobertaForMaskedLM, transformers.RobertaTokenizer),
         "albert": (transformers.AlbertForMaskedLM, transformers.AlbertTokenizer),
-        "bart": (transformers.BartForConditionalGeneration, transformers.BartTokenizer),
-        "mbart": (transformers.BartForConditionalGeneration, transformers.MBartTokenizer),
-        "electra": (transformers.ElectraForPreTraining, transformers.ElectraTokenizer),
+        "facebook/bart": (transformers.BartForConditionalGeneration, transformers.BartTokenizer),
+        "facebook/mbart": (transformers.BartForConditionalGeneration, transformers.MBartTokenizer),
+        "google/electra": (transformers.ElectraForPreTraining, transformers.ElectraTokenizer),
+
+        "gpt2": (transformers.GPT2LMHeadModel, transformers.GPT2Tokenizer),
+        "transformer": (transformers.TransfoXLLMHeadModel, transformers.TransfoXLTokenizer),
+        "xlnet": (transformers.XLNetLMHeadModel, transformers.XLNetTokenizer),
     }
     if model_type.split("-")[0] in class_lookup:
         return class_lookup[model_type.split("-")[0]]
