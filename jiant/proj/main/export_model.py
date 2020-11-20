@@ -87,6 +87,7 @@ def get_model_and_tokenizer_classes(
         "facebook/mbart": (transformers.BartForConditionalGeneration, transformers.MBartTokenizer),
         "google/electra": (transformers.ElectraForPreTraining, transformers.ElectraTokenizer),
 
+        # 以下，まだ使えない．他のファイルを編集していないから．
         "gpt2": (transformers.GPT2LMHeadModel, transformers.GPT2Tokenizer),
         "transformer": (transformers.TransfoXLLMHeadModel, transformers.TransfoXLTokenizer),
         "xlnet": (transformers.XLNetLMHeadModel, transformers.XLNetTokenizer),

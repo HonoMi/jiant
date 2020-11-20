@@ -44,8 +44,6 @@ def _write_results(split: str, results_dict, metrics_aggregator, output_dir, ver
     py_io.write_json(data=full_results_to_write, path=os.path.join(output_dir, f"{split}_metrics.json"))
 
 
-
-
 def write_preds(eval_results_dict, path):
     preds_dict = {}
     df_dict = {

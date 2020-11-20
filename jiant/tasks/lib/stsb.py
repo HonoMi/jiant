@@ -104,7 +104,7 @@ class StsbTask(GlueMixin, Task):
         return self._create_examples(lines=read_jsonl(self.test_path), set_type="test")
 
     def _get_test_labels(self):
-        return default_get_test_labels(self)
+        return default_get_test_labels(self, possible_labels=[0])
 
     @classmethod
     def _create_examples(cls, lines, set_type):
