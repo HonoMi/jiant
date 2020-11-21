@@ -1,8 +1,9 @@
-import datasets
 import os
 import tarfile
 import urllib
 import zipfile
+
+import datasets
 
 import jiant.utils.python.io as py_io
 from jiant.utils.python.datastructures import replace_key
@@ -41,9 +42,16 @@ def load_hf_dataset(path,
                                                  name=name,
                                                  version=version,
                                                  split=hf_local_phase)
-        cv_dataset = get_cv_splits(hf_local_dataset, n_fold, stratify=False)
+        cv_dataset = get_cv_splits(
+            hf_local_dataset,
+            n_fold,
+            stratify=False,
+            re_index_after_split=True,  # necessary since the guid naming of jiant is arbitrary(taken from idx of hf_datasets or taken from the number of samples) so we set the indexes here to make the final guid unique
+        )
         dataset['train'] = cv_dataset[f'cv-{fold}.train']
         dataset['val'] = cv_dataset[f'cv-{fold}.val']
+
+        # re-index
 
     return dataset
 
@@ -53,6 +61,8 @@ def convert_hf_dataset_to_examples(
     n_fold: int = None, fold: int = None,
     return_hf_dataset=False,
     return_hf_metric=False,
+    experiment_id_for_metric=None,
+    cache_dir_for_metric=None,
 ):
     """Helper function for reading from datasets.load_dataset and converting to examples
 
@@ -75,7 +85,11 @@ def convert_hf_dataset_to_examples(
                               phase_map=phase_map,
                               n_fold=n_fold,
                               fold=fold)
-    metric = datasets.load_metric(path, config_name=name)
+
+    metric = datasets.load_metric(path,
+                                  config_name=name,
+                                  experiment_id=experiment_id_for_metric,
+                                  cache_dir=cache_dir_for_metric)
 
     if phase_list is None:
         phase_list = dataset.keys()
