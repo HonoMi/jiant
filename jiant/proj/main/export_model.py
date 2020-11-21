@@ -1,11 +1,14 @@
 import os
 from typing import Tuple, Type
+import logging
 
 import torch
 import transformers
 
 import jiant.utils.python.io as py_io
 import jiant.utils.zconf as zconf
+
+logger = logging.getLogger(__name__)
 
 
 @zconf.run_config
@@ -32,6 +35,7 @@ def export_model(
     model_class: Type[transformers.PreTrainedModel],
     tokenizer_class: Type[transformers.PreTrainedTokenizer],
     hf_model_name: str = None,
+    skip_if_exists: bool = True,
 ):
     """Retrieve model and tokenizer from Transformers and save all necessary data
     Things saved:
@@ -50,26 +54,37 @@ def export_model(
     if hf_model_name is None:
         hf_model_name = model_type
 
-    tokenizer_fol_path = os.path.join(output_base_path, "tokenizer")
     model_fol_path = os.path.join(output_base_path, "model")
-    os.makedirs(tokenizer_fol_path, exist_ok=True)
-    os.makedirs(model_fol_path, exist_ok=True)
 
     model_path = os.path.join(model_fol_path, f"{model_type}.p")
-    model_config_path = os.path.join(model_fol_path, f"{model_type}.json")
-    model = model_class.from_pretrained(hf_model_name)
     os.makedirs(os.path.dirname(model_path), exist_ok=True)  # Necessary since some models are named "facebook/bart-base"
-    torch.save(model.state_dict(), model_path)
-    py_io.write_json(model.config.to_dict(), model_config_path)
+    model = model_class.from_pretrained(hf_model_name)
+    with py_io.get_lock(model_path):
+        if skip_if_exists and os.path.exists(model_path):
+            logger.info('Skip writing to %s since it already exists.', model_path)
+        else:
+            torch.save(model.state_dict(), model_path)
+
+    model_config_path = os.path.join(model_fol_path, f"{model_type}.json")
+    os.makedirs(os.path.dirname(model_config_path), exist_ok=True)
+    py_io.write_json(model.config.to_dict(), model_config_path, skip_if_exists=skip_if_exists)
+
+    tokenizer_fol_path = os.path.join(output_base_path, "tokenizer")
+    # os.makedirs(tokenizer_fol_path, exist_ok=True)
     tokenizer = tokenizer_class.from_pretrained(hf_model_name)
-    tokenizer.save_pretrained(tokenizer_fol_path)
+    with py_io.get_lock(tokenizer_fol_path):
+        if skip_if_exists and os.path.exists(tokenizer_fol_path):
+            logger.info('Skip writing to %s since it already exists.', tokenizer_fol_path)
+        else:
+            tokenizer.save_pretrained(tokenizer_fol_path)
+
     config = {
         "model_type": model_type,
         "model_path": model_path,
         "model_config_path": model_config_path,
         "model_tokenizer_path": tokenizer_fol_path,
     }
-    py_io.write_json(config, os.path.join(output_base_path, f"config.json"))
+    py_io.write_json(config, os.path.join(output_base_path, f"config.json"), skip_if_exists=skip_if_exists)
 
 
 def get_model_and_tokenizer_classes(

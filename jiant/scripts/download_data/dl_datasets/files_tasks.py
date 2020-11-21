@@ -84,6 +84,7 @@ def download_squad_data_and_write_config(
             "name": task_name,
         },
         path=task_config_path,
+        skip_if_exists=True,
     )
 
 
@@ -150,6 +151,7 @@ def download_abductive_nli_data_and_write_config(
             "name": task_name,
         },
         path=task_config_path,
+        skip_if_exists=True,
     )
 
 
@@ -175,6 +177,7 @@ def download_swag_data_and_write_config(task_name: str, task_data_path: str, tas
             "name": task_name,
         },
         path=task_config_path,
+        skip_if_exists=True,
     )
 
 
@@ -207,6 +210,7 @@ def download_qamr_data_and_write_config(task_name: str, task_data_path: str, tas
             "name": task_name,
         },
         path=task_config_path,
+        skip_if_exists=True,
     )
 
 
@@ -236,6 +240,7 @@ def download_qasrl_data_and_write_config(
             "name": task_name,
         },
         path=task_config_path,
+        skip_if_exists=True,
     )
 
 
@@ -550,7 +555,7 @@ def download_newsqa_data_and_write_config(
             output_entry["qas"].append({"question": qn["q"], "answer": qn["consensus"]})
         phase_dict[phase].append(output_entry)
     for phase, phase_data in phase_dict.items():
-        py_io.write_jsonl(phase_data, os.path.join(task_data_path, f"{phase}.jsonl"))
+        py_io.write_jsonl(phase_data, os.path.join(task_data_path, f"{phase}.jsonl"), skip_if_exists=True)
     py_io.write_json(
         data={
             "task": task_name,
@@ -562,6 +567,7 @@ def download_newsqa_data_and_write_config(
             "name": task_name,
         },
         path=task_config_path,
+        skip_if_exists=True,
     )
     for file_name in file_name_list:
         os.remove(os.path.join(task_data_path, file_name))
@@ -589,4 +595,5 @@ def download_mrqa_natural_questions_data_and_write_config(
             "name": task_name,
         },
         path=task_config_path,
+        skip_if_exists=True,
     )

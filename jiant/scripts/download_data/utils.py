@@ -111,12 +111,12 @@ def convert_hf_dataset_to_examples(
     return ret
 
 
-def write_examples_to_jsonls(examples_dict, task_data_path):
+def write_examples_to_jsonls(examples_dict, task_data_path, skip_if_exists=False):
     os.makedirs(task_data_path, exist_ok=True)
     paths_dict = {}
     for phase, example_list in examples_dict.items():
         jsonl_path = os.path.join(task_data_path, f"{phase}.jsonl")
-        py_io.write_jsonl(example_list, jsonl_path)
+        py_io.write_jsonl(example_list, jsonl_path, skip_if_exists=skip_if_exists)
         paths_dict[phase] = jsonl_path
     return paths_dict
 

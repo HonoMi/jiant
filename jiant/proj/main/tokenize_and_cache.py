@@ -86,8 +86,6 @@ def full_chunk_and_save(task, phase, examples, feat_spec, tokenizer, args: RunCo
         phase=phase,
         verbose=True,
     )
-    if phase == 'test':
-        labels = [data['data_row'].label_id for data in dataset]  # HONOKA
     if args.smart_truncate:
         dataset, length = preprocessing.smart_truncate(
             dataset=dataset, max_seq_length=args.max_seq_length, verbose=True,

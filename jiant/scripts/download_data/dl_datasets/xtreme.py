@@ -4,13 +4,17 @@ import itertools
 import os
 import shutil
 from pathlib import Path
+import logging
 
+from filelock import FileLock
 import jiant.scripts.download_data.utils as download_utils
 import jiant.utils.display as display
 import jiant.utils.python.datastructures as datastructures
 import jiant.utils.python.io as py_io
 import jiant.utils.python.filesystem as filesystem
 import jiant.utils.python.strings as strings
+
+logger = logging.getLogger(__name__)
 
 
 def download_xnli_data_and_write_config(task_data_base_path: str, task_config_base_path: str):
@@ -28,8 +32,8 @@ def download_xnli_data_and_write_config(task_data_base_path: str, task_config_ba
         task_data_path = py_io.create_dir(task_data_base_path, task_name)
         val_path = os.path.join(task_data_path, "val.jsonl")
         test_path = os.path.join(task_data_path, "test.jsonl")
-        py_io.write_jsonl(data=val_data[lang], path=val_path)
-        py_io.write_jsonl(data=test_data[lang], path=test_path)
+        py_io.write_jsonl(data=val_data[lang], path=val_path, skip_if_exists=True)
+        py_io.write_jsonl(data=test_data[lang], path=test_path, skip_if_exists=True)
         py_io.write_json(
             data={
                 "task": "xnli",
@@ -38,6 +42,7 @@ def download_xnli_data_and_write_config(task_data_base_path: str, task_config_ba
                 "kwargs": {"language": lang},
             },
             path=os.path.join(task_config_base_path, f"{task_name}_config.json"),
+            skip_if_exists=True,
         )
     shutil.rmtree(xnli_temp_path)
 
@@ -69,6 +74,7 @@ def download_pawsx_data_and_write_config(task_data_base_path: str, task_config_b
                 "kwargs": {"language": lang},
             },
             path=os.path.join(task_config_base_path, f"{task_name}_config.json"),
+            skip_if_exists=True,
         )
     shutil.rmtree(pawsx_temp_path)
 
@@ -126,29 +132,43 @@ def download_udpos_data_and_write_config(task_data_base_path: str, task_config_b
             if len(data[split]) > 0:
                 prefix = os.path.join(output_dir, f"{split}-{lang_}")
                 if suffix == "mt":
-                    with open(prefix + ".mt.tsv", "w") as fout:
-                        for idx, (sent, tag, _) in enumerate(data[split]):
-                            newline = "\n" if idx != len(data[split]) - 1 else ""
-                            fout.write("{}\t{}{}".format(" ".join(sent), " ".join(tag), newline))
-                    check_file(prefix + ".mt.tsv")
-                    print("    - finish checking " + prefix + ".mt.tsv")
+                    path = prefix + ".mt.tsv"
+                    if os.path.exists(path):
+                        logger.info('Skip writing to %s since it already exists.', path)
+                    else:
+                        with py_io.get_lock(path):
+                            with open(path, "w") as fout:
+                                for idx, (sent, tag, _) in enumerate(data[split]):
+                                    newline = "\n" if idx != len(data[split]) - 1 else ""
+                                    fout.write("{}\t{}{}".format(" ".join(sent), " ".join(tag), newline))
+                            check_file(prefix + ".mt.tsv")
+                            print("    - finish checking " + prefix + ".mt.tsv")
                 elif suffix == "tsv":
-                    with open(prefix + ".tsv", "w") as fout:
-                        for sidx, (sent, tag, _) in enumerate(data[split]):
-                            for widx, (w, t) in enumerate(zip(sent, tag)):
-                                newline = (
-                                    ""
-                                    if (sidx == len(data[split]) - 1) and (widx == len(sent) - 1)
-                                    else "\n"
-                                )
-                                fout.write("{}\t{}{}".format(w, t, newline))
-                            fout.write("\n")
+                    path = prefix + ".tsv"
+                    if os.path.exists(path):
+                        logger.info('Skip writing to %s since it already exists.', path)
+                    else:
+                        with py_io.get_lock(path):
+                            with open(path, "w") as fout:
+                                for sidx, (sent, tag, _) in enumerate(data[split]):
+                                    for widx, (w, t) in enumerate(zip(sent, tag)):
+                                        newline = (
+                                            ""
+                                            if (sidx == len(data[split]) - 1) and (widx == len(sent) - 1)
+                                            else "\n"
+                                        )
+                                        fout.write("{}\t{}{}".format(w, t, newline))
+                                    fout.write("\n")
                 elif suffix == "conll":
-                    with open(prefix + ".conll", "w") as fout:
-                        for _, _, lines in data[split]:
-                            for line in lines:
-                                fout.write(line.strip() + "\n")
-                            fout.write("\n")
+                    path = prefix + ".conll"
+                    if os.path.exists(path):
+                        logger.info('Skip writing to %s since it already exists.', path)
+                    else:
+                        with open(path, "w") as fout:
+                            for _, _, lines in data[split]:
+                                for line in lines:
+                                    fout.write(line.strip() + "\n")
+                                fout.write("\n")
                 print(f"finish writing file to {prefix}.{suffix}")
 
     languages = (
@@ -246,6 +266,7 @@ def download_udpos_data_and_write_config(task_data_base_path: str, task_config_b
                 "kwargs": {"language": lang},
             },
             path=os.path.join(task_config_base_path, f"{task_name}_config.json"),
+            skip_if_exists=True,
         )
     shutil.rmtree(udpos_temp_path)
 
@@ -255,17 +276,23 @@ def download_panx_data_and_write_config(task_data_base_path: str, task_config_ba
         lines = open(infile, "r").readlines()
         if lines[-1].strip() == "":
             lines = lines[:-1]
-        with open(outfile, "w") as fout:
-            for line in lines:
-                items = line.strip().split("\t")
-                if len(items) == 2:
-                    label = items[1].strip()
-                    idx = items[0].find(":")
-                    if idx != -1:
-                        token = items[0][idx + 1 :].strip()
-                        fout.write(f"{token}\t{label}\n")
-                else:
-                    fout.write("\n")
+
+        with py_io.get_lock(outfile):
+            if os.path.exists(outfile):
+                logger.info('Skip writing to %s since it already exists.', outfile)
+                return
+
+            with open(outfile, "w") as fout:
+                for line in lines:
+                    items = line.strip().split("\t")
+                    if len(items) == 2:
+                        label = items[1].strip()
+                        idx = items[0].find(":")
+                        if idx != -1:
+                            token = items[0][idx + 1 :].strip()
+                            fout.write(f"{token}\t{label}\n")
+                    else:
+                        fout.write("\n")
 
     panx_temp_path = os.path.join(task_data_base_path, "panx_temp")
     zip_path = os.path.join(panx_temp_path, "AmazonPhotos.zip")
@@ -307,6 +334,7 @@ def download_panx_data_and_write_config(task_data_base_path: str, task_config_ba
                 "kwargs": {"language": lang},
             },
             path=os.path.join(task_config_base_path, f"{task_name}_config.json"),
+            skip_if_exists=True,
         )
     shutil.rmtree(os.path.join(panx_temp_path, "panx_dataset"))
 
@@ -329,6 +357,7 @@ def download_xquad_data_and_write_config(task_data_base_path: str, task_config_b
                 "kwargs": {"language": lang},
             },
             path=os.path.join(task_config_base_path, f"{task_name}_config.json"),
+            skip_if_exists=True,
         )
 
 
@@ -363,6 +392,7 @@ def download_mlqa_data_and_write_config(task_data_base_path: str, task_config_ba
                 "name": task_name,
             },
             path=os.path.join(task_config_base_path, f"{task_name}_config.json"),
+            skip_if_exists=True,
         )
     shutil.rmtree(mlqa_temp_path)
 
@@ -422,6 +452,7 @@ def download_tydiqa_data_and_write_config(task_data_base_path: str, task_config_
         train_path = os.path.join(task_data_path, f"tydiqa.{lang}.train.json")
         py_io.write_json(
             data=data, path=train_path,
+            skip_if_exists=True,
         )
         val_path = os.path.join(task_data_path, f"tydiqa.{lang}.dev.json")
         os.rename(
@@ -438,6 +469,7 @@ def download_tydiqa_data_and_write_config(task_data_base_path: str, task_config_
                 "name": task_name,
             },
             path=os.path.join(task_config_base_path, f"{task_name}_config.json"),
+            skip_if_exists=True,
         )
     shutil.rmtree(tydiqa_temp_path)
 
@@ -507,6 +539,7 @@ def download_bucc2018_data_and_write_config(task_data_base_path: str, task_confi
                 "name": task_name,
             },
             path=os.path.join(task_config_base_path, f"{task_name}_config.json"),
+            skip_if_exists=True,
         )
     shutil.rmtree(bucc2018_temp_path)
 
@@ -579,10 +612,16 @@ def download_tatoeba_data_and_write_config(task_data_base_path: str, task_config
         # The XTREME authors intentionally scramble the order by sorting one of the two
         # sets alphabetically. We're following their recipe, but also retaining the labels for
         # internal scoring.
-        with open(eng_out, "w") as ftgt, open(labels_out, "w") as flabels:
-            for t, i in sorted(data, key=lambda x: x[0]):
-                ftgt.write(f"{t}\n")
-                flabels.write(f"{i}\n")
+        with py_io.get_lock(eng_out):
+            with py_io.get_lock(labels_out):
+                if os.path.exists(eng_out) and os.path.exists(labels_out):
+                    logger.info('Skip writing to %s since it already exists.', eng_out)
+                    logger.info('Skip writing to %s since it already exists.', labels_out)
+                else:
+                    with open(eng_out, "w") as ftgt, open(labels_out, "w") as flabels:
+                        for t, i in sorted(data, key=lambda x: x[0]):
+                            ftgt.write(f"{t}\n")
+                            flabels.write(f"{i}\n")
         py_io.write_json(
             data={
                 "task": "tatoeba",
@@ -591,6 +630,7 @@ def download_tatoeba_data_and_write_config(task_data_base_path: str, task_config
                 "name": task_name,
             },
             path=os.path.join(task_config_base_path, f"{task_name}_config.json"),
+            skip_if_exists=True,
         )
     shutil.rmtree(tatoeba_temp_path)
 

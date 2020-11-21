@@ -1,6 +1,20 @@
 import os
 import glob
 import json
+import logging
+from filelock import SoftFileLock
+
+logger = logging.getLogger(__name__)
+
+
+def get_lock(path: str,
+             timeout: int = 120):
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+
+    lock_path = path + '.lock'
+    logger.info('trying to acquire lock "%s"', lock_path)
+
+    return SoftFileLock(lock_path, timeout=timeout)
 
 
 def read_file(path, mode="r", **kwargs):
@@ -8,17 +22,21 @@ def read_file(path, mode="r", **kwargs):
         return f.read()
 
 
-def write_file(data, path, mode="w", **kwargs):
-    with open(path, mode=mode, **kwargs) as f:
-        f.write(data)
+def write_file(data, path, mode="w", skip_if_exists=False, **kwargs):
+    with get_lock(path):
+        if os.path.exists(path) and skip_if_exists:
+            logger.info('Skip writing to %s since it already exists.', path)
+            return
+        with open(path, mode=mode, **kwargs) as f:
+            f.write(data)
 
 
 def read_json(path, mode="r", **kwargs):
     return json.loads(read_file(path, mode=mode, **kwargs))
 
 
-def write_json(data, path):
-    return write_file(json.dumps(data, indent=2), path)
+def write_json(data, path, skip_if_exists=False):
+    return write_file(json.dumps(data, indent=2), path, skip_if_exists=skip_if_exists)
 
 
 def read_jsonl(path, mode="r", **kwargs):
@@ -30,10 +48,10 @@ def read_jsonl(path, mode="r", **kwargs):
     return ls
 
 
-def write_jsonl(data, path):
+def write_jsonl(data, path, skip_if_exists=False):
     assert isinstance(data, list)
     lines = [to_jsonl(elem) for elem in data]
-    write_file("\n".join(lines), path)
+    write_file("\n".join(lines), path, skip_if_exists=skip_if_exists)
 
 
 def read_file_lines(path, mode="r", encoding="utf-8", strip_lines=False, **kwargs):

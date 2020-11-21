@@ -72,6 +72,7 @@ setup(
         "tqdm == 4.46.0",
         "transformers == 3.0.2",
         "torchvision == 0.6.0",
+        "filelock",
         "machine_learning@git+https://github.com/HonoMi/machine-learning.git@master",
         "torchsampler@git+https://github.com/HonoMi/torchsampler.git@master",
         "datasets_extra@git+https://github.com/HonoMi/datasets-extra.git@master",

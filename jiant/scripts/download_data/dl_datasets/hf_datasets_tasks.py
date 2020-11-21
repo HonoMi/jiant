@@ -3,6 +3,7 @@ import re
 
 import jiant.scripts.download_data.utils as download_utils
 import jiant.utils.python.io as py_io
+from filelock import FileLock
 
 # Note to future selves: beware of circular imports when refactoring
 from jiant.tasks.retrieval import (
@@ -192,6 +193,7 @@ def download_data_and_write_config(task_name: str, task_data_path: str, task_con
     examples_dict = build_examples(task_name, n_fold=n_fold, fold=fold)
     paths_dict = download_utils.write_examples_to_jsonls(
         examples_dict=examples_dict, task_data_path=task_data_path,
+        skip_if_exists=True
     )
     jiant_task_name = HF_DATASETS_CONVERSION_DICT[task_name].get("jiant_task_name", task_name)
     cv_jiant_task_name = build_cv_task_name(jiant_task_name, n_fold, fold)
@@ -200,4 +202,5 @@ def download_data_and_write_config(task_name: str, task_data_path: str, task_con
     py_io.write_json(
         data={"task": cv_jiant_task_name, "paths": paths_dict, "name": cv_task_name},
         path=task_config_path,
+        skip_if_exists=True,
     )
