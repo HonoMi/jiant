@@ -46,7 +46,6 @@ def load_hf_dataset(path,
             hf_local_dataset,
             n_fold,
             stratify=False,
-            re_index_after_split=True,  # necessary since the guid naming of jiant is arbitrary(taken from idx of hf_datasets or taken from the number of samples) so we set the indexes here to make the final guid unique
         )
         dataset['train'] = cv_dataset[f'cv-{fold}.train']
         dataset['val'] = cv_dataset[f'cv-{fold}.val']
