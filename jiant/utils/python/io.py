@@ -8,7 +8,7 @@ logger = logging.getLogger(__name__)
 
 
 def get_lock(path: str,
-             timeout: int = 120):
+             timeout: int = 600):
     os.makedirs(os.path.dirname(path), exist_ok=True)
 
     lock_path = path + '.lock'
