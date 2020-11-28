@@ -51,6 +51,7 @@ def complex_backpropagate(
 def get_train_dataloader_from_cache(
     train_cache: caching.ChunkedFilesDataCache, task, train_batch_size: int,
     sample_weights=None,
+    fix_seed_for_weighted_sampler=False,
 ):
     # TODO: Expose buffer_size parameter  (issue #1183)
 
@@ -58,7 +59,7 @@ def get_train_dataloader_from_cache(
         dataset = train_cache.get_iterable_dataset(buffer_size=10000, shuffle=False)
         dataset = _ListDataset([elem for elem in dataset])
         _sample_weights = pd.read_csv(sample_weights, sep='\t', header=None)[0]
-        sampler = WeightedDatasetSampler(dataset, _sample_weights)
+        sampler = WeightedDatasetSampler(dataset, _sample_weights, fix_seed=fix_seed_for_weighted_sampler)
     else:
         dataset = train_cache.get_iterable_dataset(buffer_size=10000, shuffle=True)
         sampler = None
