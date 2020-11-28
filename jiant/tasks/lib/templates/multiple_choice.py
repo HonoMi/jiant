@@ -18,7 +18,7 @@ from jiant.tasks.lib.templates.shared import (
     add_cls_token,
 )
 from jiant.tasks.utils import truncate_sequences
-
+from jiant.tasks.core import default_get_test_labels
 
 @dataclass
 class Example(BaseExample):
@@ -131,3 +131,6 @@ class AbstractMultipleChoiceTask(Task, ABC):
     CHOICE_KEYS = NotImplemented
     CHOICE_BIMAP = NotImplemented
     NUM_CHOICES = NotImplemented
+
+    def _get_test_labels(self):
+        return default_get_test_labels(self, self.CHOICE_KEYS)

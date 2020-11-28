@@ -4,7 +4,6 @@ from jiant.tasks.lib.templates.shared import labels_to_bimap
 from jiant.tasks.lib.templates import multiple_choice as mc_template
 from jiant.utils.python.io import read_json_lines
 from jiant.tasks.core import SuperGlueMixin
-from jiant.tasks.core import default_get_test_labels
 
 
 @dataclass
@@ -52,9 +51,6 @@ class CopaTask(SuperGlueMixin, mc_template.AbstractMultipleChoiceTask):
 
     def get_test_examples(self):
         return self._create_examples(lines=read_json_lines(self.test_path), set_type="test")
-
-    def _get_test_labels(self):
-        return default_get_test_labels(self, possible_labels=self.CHOICE_KEYS)
 
     @classmethod
     def _create_examples(cls, lines, set_type):

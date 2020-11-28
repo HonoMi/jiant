@@ -21,7 +21,6 @@ from jiant.tasks.lib.templates.shared import (
 )
 from jiant.tasks.utils import truncate_sequences
 from jiant.utils.python.io import read_json_lines
-from jiant.tasks.core import default_get_test_labels
 
 @dataclass
 class Example(BaseExample):
@@ -150,9 +149,6 @@ class MultiRCTask(SuperGlueMixin, Task):
 
     def get_test_examples(self):
         return self._create_examples(lines=read_json_lines(self.test_path), set_type="test")
-
-    def _get_test_labels(self):
-        return default_get_test_labels(self)
 
     def _create_examples(self, lines, set_type):
         examples = []

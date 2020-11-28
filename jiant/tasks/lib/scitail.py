@@ -2,6 +2,7 @@ import numpy as np
 import torch
 from dataclasses import dataclass
 from typing import List
+from jiant.tasks.core import default_get_test_labels
 
 from jiant.tasks.core import (
     BaseExample,

@@ -206,18 +206,18 @@ class Task:
         raise NotImplementedError()
 
     def _get_test_labels(self):
-        raise NotImplementedError()
+        # XXX: サブクラスで継承すること．
+        return default_get_test_labels(self, self.LABELS)
 
 
-def default_get_test_labels(default_task: Task, possible_labels=None):
+def default_get_test_labels(task: Task, possible_labels):
     """test setのラベルを獲得する．
 
-    Taskのサブクラスで`_get_test_labels`を実装する際に利用せよ(参考: jiant/tasks/lib/mrpc.py)．
-    本関数が動作するかどうかは，サブクラスの実装による．
+    本関数が動作するかは，サブクラスの実装による．
+    多くのサブクラスは(上位クラスで明示されない)同一のinterfaceを持っているため，この実装でうまくいく．
     """
-    possible_labels = possible_labels or default_task.LABELS
     labels = [example.label
-              for example in default_task._create_examples(lines=read_jsonl(default_task.test_path), set_type="valid")]
+              for example in task._create_examples(lines=read_jsonl(task.test_path), set_type="valid")]
     if any([label not in possible_labels for label in labels]):  # masked labels
         labels = [possible_labels[-1]] * len(labels)
     return labels

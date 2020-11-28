@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from jiant.shared.constants import PHASE
 from jiant.tasks.lib.templates.squad_style import core as squad_style_template
 from jiant.utils.python.io import read_jsonl
+from jiant.tasks.core import default_get_test_labels
 
 
 @dataclass
