@@ -46,6 +46,14 @@ class CosmosQATask(mc_template.AbstractMultipleChoiceTask):
     def get_test_examples(self):
         return self._create_examples(path=self.test_path, set_type="test")
 
+    def _get_test_labels(self):
+        possible_labels = self.CHOICE_KEYS
+        labels = [example.label
+                  for example in self._create_examples(self.test_path, "valid")]
+        if any([label not in possible_labels for label in labels]):  # masked labels
+            labels = [possible_labels[-1]] * len(labels)
+        return labels
+
     @classmethod
     def _create_examples(cls, path, set_type):
         if path.endswith(".csv"):

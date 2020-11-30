@@ -217,7 +217,7 @@ def default_get_test_labels(task: Task, possible_labels):
     多くのサブクラスは(上位クラスで明示されない)同一のinterfaceを持っているため，この実装でうまくいく．
     """
     labels = [example.label
-              for example in task._create_examples(lines=read_jsonl(task.test_path), set_type="valid")]
+              for example in task._create_examples(read_jsonl(task.test_path), "valid")]
     if any([label not in possible_labels for label in labels]):  # masked labels
         labels = [possible_labels[-1]] * len(labels)
     return labels

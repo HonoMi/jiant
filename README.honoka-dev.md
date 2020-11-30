@@ -20,7 +20,8 @@
         - copa
         - boolq
     * その他
-        - arc_easy
+        - arc_easy:
+            * 却下．４択の問題と，５択の問題が混在しているため．実装側で対応できる可能性はあるが，面倒くさい．(stacking等)
         - arc_challenge
         - commonsenseqa
         - cosmosqa
@@ -28,8 +29,7 @@
         - quoref
         - scitail
         - snli
-        - socialqa
-        - swag
+        - socialiqa
 
 ## test setのmetricsを計測するために．
 * test setのmetricsを計測することができる条件

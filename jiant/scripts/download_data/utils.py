@@ -3,12 +3,11 @@ import tarfile
 import urllib
 import zipfile
 
-import datasets
-
 import jiant.utils.python.io as py_io
 from jiant.utils.python.datastructures import replace_key
 from datasets_extra.processing import build_cv_splits
-from datasets_extra import load_metric
+from datasets_extra import load_metric, load_dataset
+# from datasets_extra import load_dataset as load_hf_dataset, load_metric as load_hf_metric
 
 
 def load_hf_dataset(path,
@@ -21,7 +20,7 @@ def load_hf_dataset(path,
     phase_map = phase_map or {}
     split_type = split_type or 'local_evaluation'
 
-    dataset = datasets.load_dataset(path=path, name=name, version=version)
+    dataset = load_dataset(path=path, name=name, version=version)
 
     for old_phase_name, new_phase_name in phase_map.items():
         replace_key(dataset, old_key=old_phase_name, new_key=new_phase_name)
@@ -39,7 +38,7 @@ def load_hf_dataset(path,
         else:
             raise ValueError(f'Unknown split type "{split_type}"')
 
-        hf_local_dataset = datasets.load_dataset(path=path,
+        hf_local_dataset = load_dataset(path=path,
                                                  name=name,
                                                  version=version,
                                                  split=hf_local_phase)

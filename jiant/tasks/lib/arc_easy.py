@@ -62,7 +62,8 @@ class ArcEasyTask(mc_template.AbstractMultipleChoiceTask):
             label = line["answerKey"]
             if label in potential_label_map:
                 label = potential_label_map[label]
-            choice_list = [d["text"] for d in line["question"]["choices"]]
+            # choice_list = [d["text"] for d in line["choices"]]
+            choice_list = line["choices"]["text"]
             filler_choice_list = ["." for i in range(NUM_CHOICES - len(choice_list))]
             choice_list = choice_list + filler_choice_list
             assert len(choice_list) == NUM_CHOICES
@@ -70,7 +71,7 @@ class ArcEasyTask(mc_template.AbstractMultipleChoiceTask):
             examples.append(
                 Example(
                     guid="%s-%s" % (set_type, i),
-                    prompt=line["question"]["stem"],
+                    prompt=line["question"],
                     choice_list=choice_list,
                     label=label,
                 )
