@@ -1,9 +1,13 @@
 import csv
 import os
 import tqdm
+import logging
 
 import jiant.utils.python.io as py_io
 import jiant.utils.zconf as zconf
+from jiant.utils.logging import regular_log
+
+logger = logging.getLogger(__name__)
 
 
 GLUE_CONVERSION = {
@@ -178,7 +182,9 @@ def preprocess_all_glue_data(input_base_path, output_base_path, task_name_ls=Non
     os.makedirs(output_base_path, exist_ok=True)
     os.makedirs(os.path.join(output_base_path, "data"), exist_ok=True)
     os.makedirs(os.path.join(output_base_path, "configs"), exist_ok=True)
-    for task_name in tqdm.tqdm(task_name_ls):
+    for step, task_name in enumerate(tqdm.tqdm(task_name_ls)):
+        regular_log(logger, step)
+
         task_data_path = os.path.join(output_base_path, "data", task_name)
         paths_dict = convert_glue_data(
             input_base_path=input_base_path, task_data_path=task_data_path, task_name=task_name,

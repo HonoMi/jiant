@@ -16,13 +16,17 @@ class TaskSpecificConfig(ExtendedDataClassMixin):
     gradient_accumulation_steps: int
     eval_subset_num: int
     train_sample_weights: str
-    fix_seed_for_weighted_sampler: bool
 
 
 @dataclass
 class GlobalTrainConfig(ExtendedDataClassMixin):
     max_steps: int
+    steps_per_epoch: int
     warmup_steps: int
+    weighted_sampling_start_step: int
+    # weighted_sampling_start_epoch: int
+    fix_seed_for_weighted_sampler: bool
+
 
 
 @dataclass

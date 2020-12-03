@@ -1,11 +1,14 @@
 import math
 import os
+import logging
 
 import torch
 
 import jiant.utils.zconf as zconf
 import jiant.utils.python.io as py_io
 import jiant.utils.python.datastructures as py_datastructures
+
+logger = logging.getLogger(__name__)
 
 
 class Registry:
@@ -91,6 +94,8 @@ class SingleTaskConfigurator(zconf.RunConfig):
     gradient_accumulation_steps = zconf.attr(type=int, default=1)
     eval_subset_num = zconf.attr(type=int, default=500)
     train_sample_weights = zconf.attr(type=str, default=None)
+    weighted_sampling_start_step = zconf.attr(type=int, default=0)  # zero start
+    weighted_sampling_start_epoch = zconf.attr(type=int, default=0)  # zero start
     fix_seed_for_weighted_sampler = zconf.attr(action="store_true")
     epochs = zconf.attr(type=int, default=None)
     max_steps = zconf.attr(type=int, default=None)
@@ -133,6 +138,19 @@ class SingleTaskConfigurator(zconf.RunConfig):
             assert os.path.exists(v)
 
         # === Compute training steps === #
+        if self.num_gpus:
+            # We multiply by num_gpus because 1 step is done across (potentially) multiple GPUs
+            effective_batch_size = (
+                self.train_batch_size * self.gradient_accumulation_steps * self.num_gpus
+            )
+        else:
+            effective_batch_size = self.train_batch_size * self.gradient_accumulation_steps
+        logger.info('effective_batch_size: %f', effective_batch_size)
+        num_examples = get_num_examples_from_cache(
+            cache_path=os.path.expandvars(task_cache_config["train"]),
+        )
+        steps_per_epoch = math.ceil(num_examples / effective_batch_size)
+
         if not self.do_train:
             assert self.epochs is None
             assert self.max_steps is None
@@ -141,19 +159,12 @@ class SingleTaskConfigurator(zconf.RunConfig):
             max_steps = self.max_steps
         elif self.epochs is not None:
             assert self.max_steps is None
-            if self.num_gpus:
-                # We multiply by num_gpus because 1 step is done across (potentially) multiple GPUs
-                effective_batch_size = (
-                    self.train_batch_size * self.gradient_accumulation_steps * self.num_gpus
-                )
-            else:
-                effective_batch_size = self.train_batch_size * self.gradient_accumulation_steps
-            num_examples = get_num_examples_from_cache(
-                cache_path=os.path.expandvars(task_cache_config["train"]),
-            )
-            max_steps = self.epochs * math.ceil(num_examples / effective_batch_size)
+            max_steps = self.epochs * steps_per_epoch
         else:
             raise RuntimeError("Require either `epochs` or `max_steps`")
+
+        if self.weighted_sampling_start_step == 0:
+            self.weighted_sampling_start_step = self.weighted_sampling_start_epoch * steps_per_epoch
 
         # === Compute eval_batch_size === #
         if self.eval_batch_size is not None:
@@ -174,6 +185,9 @@ class SingleTaskConfigurator(zconf.RunConfig):
             "global_train_config": {
                 "max_steps": int(max_steps),
                 "warmup_steps": int(max_steps * self.warmup_steps_proportion),
+                "weighted_sampling_start_step": self.weighted_sampling_start_step,
+                # "weighted_sampling_start_epoch": self.weighted_sampling_start_epoch,
+                "fix_seed_for_weighted_sampler": self.fix_seed_for_weighted_sampler,
             },
             "task_specific_configs_dict": {
                 self.task_name: {
@@ -182,7 +196,6 @@ class SingleTaskConfigurator(zconf.RunConfig):
                     "gradient_accumulation_steps": self.gradient_accumulation_steps,
                     "eval_subset_num": self.eval_subset_num,
                     "train_sample_weights": self.train_sample_weights,
-                    "fix_seed_for_weighted_sampler": self.fix_seed_for_weighted_sampler,
                 }
             },
             "taskmodels_config": {
@@ -257,6 +270,8 @@ class SimpleAPIMultiTaskConfigurator(zconf.RunConfig):
     gradient_accumulation_steps = zconf.attr(type=int, default=1)
     eval_subset_num = zconf.attr(type=int, default=500)
     train_sample_weights = zconf.attr(type=str, default=None)
+    weighted_sampling_start_step = zconf.attr(type=int, default=0)
+    weighted_sampling_start_epoch = zconf.attr(type=int, default=1)
     fix_seed_for_weighted_sampler = zconf.attr(action="store_true")
     epochs = zconf.attr(type=int, default=None)
     max_steps = zconf.attr(type=int, default=None)
@@ -373,6 +388,7 @@ class SimpleAPIMultiTaskConfigurator(zconf.RunConfig):
             max_steps = 0
         else:
             max_steps = self.max_steps
+        steps_per_epoch = 0
         for task_name in task_name_list_dict["train"]:
             if self.num_gpus:
                 # We multiply by num_gpus because 1 step is done across (potentially) multiple GPUs
@@ -381,6 +397,7 @@ class SimpleAPIMultiTaskConfigurator(zconf.RunConfig):
                 )
             else:
                 effective_batch_size = self.train_batch_size * self.gradient_accumulation_steps
+            logger.info('effective_batch_size: %f', effective_batch_size)
             num_examples = get_num_examples_from_cache(
                 cache_path=os.path.expandvars(task_cache_config_dict[task_name]["train"]),
             )
@@ -389,8 +406,13 @@ class SimpleAPIMultiTaskConfigurator(zconf.RunConfig):
             )
             num_examples_dict[task_name] = num_examples
             capped_num_examples_dict[task_name] = capped_num_examples
-            if max_steps_not_given:
-                max_steps += self.epochs * math.ceil(capped_num_examples / effective_batch_size)
+            this_task_num_steps = math.ceil(capped_num_examples / effective_batch_size)
+            steps_per_epoch += this_task_num_steps
+        if max_steps_not_given:
+            max_steps += self.epochs * steps_per_epoch
+
+        if self.weighted_sampling_start_step == 0:
+            self.weighted_sampling_start_step = self.weighted_sampling_start_epoch * steps_per_epoch
 
         # === Compute eval_batch_size === #
         # Eval batch size is often a multiple of train batch size,
@@ -423,7 +445,11 @@ class SimpleAPIMultiTaskConfigurator(zconf.RunConfig):
             "sampler_config": sampler_config,
             "global_train_config": {
                 "max_steps": int(max_steps),
+                "steps_per_epoch": int(steps_per_epoch),
                 "warmup_steps": int(max_steps * self.warmup_steps_proportion),
+                "weighted_sampling_start_step": self.weighted_sampling_start_step,
+                # "weighted_sampling_start_epoch": self.weighted_sampling_start_epoch,
+                "fix_seed_for_weighted_sampler": self.fix_seed_for_weighted_sampler,
             },
             "task_specific_configs_dict": {
                 task_name: {
@@ -432,7 +458,6 @@ class SimpleAPIMultiTaskConfigurator(zconf.RunConfig):
                     "gradient_accumulation_steps": self.gradient_accumulation_steps,
                     "eval_subset_num": self.eval_subset_num,
                     "train_sample_weights": self.train_sample_weights,
-                    "fix_seed_for_weighted_sampler": self.fix_seed_for_weighted_sampler,
                 }
                 for task_name in full_task_name_list
             },

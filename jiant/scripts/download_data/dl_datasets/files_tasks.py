@@ -6,13 +6,17 @@ import shutil
 import tarfile
 from operator import itemgetter
 from collections import Counter
+import logging
 
 import jiant.scripts.download_data.utils as download_utils
 import jiant.utils.display as display
 import jiant.utils.python.filesystem as filesystem
 import jiant.utils.python.io as py_io
+from jiant.utils.logging import regular_log
 
 from jiant.scripts.download_data.constants import SQUAD_TASKS, DIRECT_SUPERGLUE_TASKS_TO_DATA_URLS
+
+logger = logging.getLogger(__name__)
 
 
 def download_task_data_and_write_config(task_name: str, task_data_path: str, task_config_path: str):
@@ -284,9 +288,11 @@ def download_newsqa_data_and_write_config(
         )
 
         if "story_text" in result.keys():
-            for row_ in display.tqdm(
+            for step, row_ in enumerate(display.tqdm(
                 result.itertuples(), total=len(result), desc="Adjusting story texts"
-            ):
+            )):
+                regular_log(logger, step)
+
                 story_text_ = row_.story_text.replace("\r\n", "\n")
                 result.at[row_.Index, "story_text"] = story_text_
 
@@ -375,7 +381,9 @@ def download_newsqa_data_and_write_config(
             "^(Copyright|Entire contents of this article copyright, )"
         )
         with display.tqdm(total=len(remaining_story_ids), desc="Getting story texts") as pbar:
-            for member in t.getmembers():
+            for step, member in enumerate(t.getmembers()):
+                regular_log(logger, step)
+
                 story_id = member.name
                 if story_id in remaining_story_ids:
                     remaining_story_ids.remove(story_id)
@@ -417,7 +425,9 @@ def download_newsqa_data_and_write_config(
                     if len(remaining_story_ids) == 0:
                         break
 
-    for row in display.tqdm(dataset.itertuples(), total=len(dataset), desc="Setting story texts"):
+    for step, row in enumerate(display.tqdm(dataset.itertuples(), total=len(dataset), desc="Setting story texts")):
+        regular_log(logger, step)
+
         # Set story_text since we cannot include it in the dataset.
         story_text = story_id_to_text[row.story_id]
         dataset.at[row.Index, "story_text"] = story_text
@@ -497,7 +507,9 @@ def download_newsqa_data_and_write_config(
         else:
             return ValueError("{} not found in any story ID set.".format(story_id))
 
-    for row in display.tqdm(dataset.itertuples(), total=len(dataset), desc="Building json"):
+    for step, row in enumerate(display.tqdm(dataset.itertuples(), total=len(dataset), desc="Building json")):
+        regular_log(logger, step)
+
         questions = cache.get(row.story_id)
         if questions is None:
             questions = []

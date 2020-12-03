@@ -1,10 +1,14 @@
 import numpy as np
 import torch
+import logging
 
 import jiant.shared.caching as shared_caching
 import jiant.utils.torch_utils as torch_utils
 from jiant.tasks.core import FeaturizationSpec, TaskTypes
 from jiant.utils.display import maybe_tqdm, maybe_trange
+from jiant.utils.logging import regular_log
+
+logger = logging.getLogger(__name__)
 
 
 class MaxValidLengthRecorder:
@@ -48,7 +52,8 @@ def smart_truncate(dataset: torch_utils.ListDataset, max_seq_length: int, verbos
         return dataset, max_seq_length
 
     new_datum_ls = []
-    for datum in maybe_tqdm(dataset.data, desc="Smart truncate data", verbose=verbose):
+    for step, datum in enumerate(maybe_tqdm(dataset.data, desc="Smart truncate data", verbose=verbose)):
+        regular_log(logger, step)
         new_datum_ls.append(
             smart_truncate_datum(
                 datum=datum, max_seq_length=max_seq_length, max_valid_length=max_valid_length,
@@ -67,7 +72,8 @@ def smart_truncate_cache(
     for chunk_i in maybe_trange(cache.num_chunks, desc="Smart truncate chunks", verbose=verbose):
         chunk = torch.load(cache.get_chunk_path(chunk_i))
         new_chunk = []
-        for datum in maybe_tqdm(chunk, desc="Smart truncate chunk-datum", verbose=verbose):
+        for step, datum in enumerate(maybe_tqdm(chunk, desc="Smart truncate chunk-datum", verbose=verbose)):
+            regular_log(logger, step)
             new_chunk.append(
                 smart_truncate_datum(
                     datum=datum, max_seq_length=max_seq_length, max_valid_length=max_valid_length,
@@ -169,7 +175,8 @@ def tokenize_and_featurize(
     # TODO: Better solution  (issue #1184)
     if task.TASK_TYPE == TaskTypes.SQUAD_STYLE_QA:
         data_rows = []
-        for example in maybe_tqdm(examples, desc="Tokenizing", verbose=verbose):
+        for step, example in enumerate(maybe_tqdm(examples, desc="Tokenizing", verbose=verbose)):
+            regular_log(logger, step)
             data_rows += example.to_feature_list(
                 tokenizer=tokenizer,
                 max_seq_length=feat_spec.max_seq_length,
@@ -178,10 +185,10 @@ def tokenize_and_featurize(
                 set_type=phase,
             )
     else:
-        data_rows = [
-            example.tokenize(tokenizer).featurize(tokenizer, feat_spec)
-            for example in maybe_tqdm(examples, desc="Tokenizing", verbose=verbose)
-        ]
+        data_rows = []
+        for step, example in enumerate(maybe_tqdm(examples, desc="Tokenizing", verbose=verbose)):
+            regular_log(logger, step)
+            data_rows.append(example.tokenize(tokenizer).featurize(tokenizer, feat_spec))
     return data_rows
 
 
@@ -202,7 +209,8 @@ def iter_chunk_tokenize_and_featurize(
         DataRow containing tokenized and featurized examples.
 
     """
-    for example in maybe_tqdm(examples, desc="Tokenizing", verbose=verbose):
+    for step, example in enumerate(maybe_tqdm(examples, desc="Tokenizing", verbose=verbose)):
+        regular_log(logger, step)
         # TODO: Better solution  (issue #1184)
         if task.TASK_TYPE == TaskTypes.SQUAD_STYLE_QA:
             yield from example.to_feature_list(

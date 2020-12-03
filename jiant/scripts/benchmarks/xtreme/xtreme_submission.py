@@ -1,6 +1,7 @@
 import os
 import numpy as np
 import torch
+import logging
 
 import zconf
 import jiant.utils.python.io as py_io
@@ -16,6 +17,9 @@ import jiant.tasks.lib.bucc2018 as bucc2018_lib
 import jiant.tasks as tasks
 import jiant.proj.main.components.evaluate as jiant_evaluate
 from jiant.proj.main.modeling.primary import wrap_jiant_forward
+from jiant.utils.logging import regular_log
+
+logger = logging.getLogger(__name__)
 
 
 @zconf.run_config
@@ -201,6 +205,8 @@ def get_preds_for_single_tagging_task(
     for step, (batch, batch_metadata) in enumerate(
         maybe_tqdm(test_dataloader, desc=f"Eval ({task.name}, Test)", verbose=verbose)
     ):
+        regular_log(logger, step, interval=10)
+
         batch = batch.to(device)
 
         with torch.no_grad():

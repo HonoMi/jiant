@@ -1,5 +1,6 @@
 from typing import Dict
 from dataclasses import dataclass
+import logging
 
 import torch
 
@@ -15,6 +16,9 @@ from jiant.shared.runner import (
 )
 from jiant.utils.display import maybe_tqdm
 from jiant.utils.python.datastructures import InfiniteYield, ExtendedDataClassMixin
+from jiant.utils.logging import regular_log
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -67,11 +71,17 @@ class JiantRunner:
         train_state = TrainState.from_task_name_list(
             self.jiant_task_container.task_run_config.train_task_list
         )
-        for _ in maybe_tqdm(
-            range(self.jiant_task_container.global_train_config.max_steps),
+        global_train_config = self.jiant_task_container.global_train_config
+        for step in maybe_tqdm(
+            range(global_train_config.max_steps),
             desc="Training",
             verbose=verbose,
         ):
+            regular_log(logger, step, interval=10, tag='train')
+
+            if step == global_train_config.weighted_sampling_start_step:
+                train_dataloader_dict = self.get_train_dataloader_dict(do_weighted_sampling=True)
+
             self.run_train_step(
                 train_dataloader_dict=train_dataloader_dict, train_state=train_state
             )
@@ -80,13 +90,19 @@ class JiantRunner:
     def resume_train_context(self, train_state, verbose=True):
         train_dataloader_dict = self.get_train_dataloader_dict()
         start_position = train_state.global_steps
-        for _ in maybe_tqdm(
-            range(start_position, self.jiant_task_container.global_train_config.max_steps),
+        global_train_config = self.jiant_task_container.global_train_config
+        for step in maybe_tqdm(
+            range(start_position, global_train_config.max_steps),
             desc="Training",
             initial=start_position,
-            total=self.jiant_task_container.global_train_config.max_steps,
+            total=global_train_config.max_steps,
             verbose=verbose,
         ):
+            regular_log(logger, step, interval=10, tag='train')
+
+            if step == self.jiant_task_container.global_train_config.weighted_sampling_start_step:
+                train_dataloader_dict = self.get_train_dataloader_dict(do_weighted_sampling=True)
+
             self.run_train_step(
                 train_dataloader_dict=train_dataloader_dict, train_state=train_state
             )
@@ -130,7 +146,7 @@ class JiantRunner:
             task_name_list=task_name_list, use_subset=use_subset
         )
         return self._run_eval(task_name_list, dataloader_dict, labels_dict,
-                              phase=PHASE.TRAIN, use_subset=use_subset, return_preds=return_preds)
+                              phase=PHASE.TRAIN, use_subset=use_subset, return_preds=return_preds, log_tag='train')
 
     def run_val(self, task_name_list, use_subset=None, return_preds=False, verbose=True):
         dataloader_dict = self.get_val_dataloader_dict(
@@ -140,7 +156,7 @@ class JiantRunner:
             task_name_list=task_name_list, use_subset=use_subset
         )
         return self._run_eval(task_name_list, dataloader_dict, labels_dict,
-                              phase=PHASE.VAL, use_subset=use_subset, return_preds=return_preds)
+                              phase=PHASE.VAL, use_subset=use_subset, return_preds=return_preds, log_tag='valid')
 
     def run_test(self, task_name_list, use_subset=None, return_preds=False, verbose=True):
         dataloader_dict = self.get_test_dataloader_dict()
@@ -149,7 +165,7 @@ class JiantRunner:
         )
 
         return self._run_eval(task_name_list, dataloader_dict, labels_dict,
-                              phase=PHASE.TEST, use_subset=use_subset, return_preds=return_preds)
+                              phase=PHASE.TEST, use_subset=use_subset, return_preds=return_preds, log_tag='test')
 
     def _run_eval(self,
                   task_name_list,
@@ -158,7 +174,8 @@ class JiantRunner:
                   phase=None,
                   use_subset=None,
                   return_preds=False,
-                  verbose=True):
+                  verbose=True,
+                  log_tag='valid'):
         evaluate_dict = {}
         for task_name in task_name_list:
             task = self.jiant_task_container.task_dict[task_name]
@@ -172,6 +189,7 @@ class JiantRunner:
                 local_rank=self.rparams.local_rank,
                 return_preds=return_preds,
                 verbose=verbose,
+                log_tag=log_tag,
             )
         return evaluate_dict
 
@@ -190,7 +208,10 @@ class JiantRunner:
     #         )
     #     return evaluate_dict
 
-    def get_train_dataloader_dict(self, for_eval=False, use_subset=False):
+    def get_train_dataloader_dict(self,
+                                  for_eval=False,
+                                  use_subset=False,
+                                  do_weighted_sampling=False):
         # Not currently supported distributed parallel
         train_dataloader_dict = {}
         for task_name in self.jiant_task_container.task_run_config.train_task_list:
@@ -205,11 +226,19 @@ class JiantRunner:
                     subset_num=task_specific_config.eval_subset_num if use_subset else None,
                 )
             else:
+                if do_weighted_sampling:
+                    sample_weights = task_specific_config.train_sample_weights
+                    logger.info('building train loader with sample weights "%s"',
+                                task_specific_config.train_sample_weights)
+                else:
+                    logger.info('building train loader without sample weights')
+
+                    sample_weights = None
                 train_dataloader_dict[task_name] = InfiniteYield(
                     get_train_dataloader_from_cache(
                         train_cache=train_cache, task=task, train_batch_size=task_specific_config.train_batch_size,
-                        sample_weights=task_specific_config.train_sample_weights,
-                        fix_seed_for_weighted_sampler=task_specific_config.fix_seed_for_weighted_sampler,
+                        sample_weights=sample_weights,
+                        fix_seed_for_weighted_sampler=self.jiant_task_container.global_train_config.fix_seed_for_weighted_sampler,
                     ),
                 )
         return train_dataloader_dict
@@ -308,6 +337,7 @@ def run_val(
     return_preds=False,
     return_logits=True,
     verbose=True,
+    log_tag='valid',
 ):
     # Reminder:
     #   val_dataloader contains mostly PyTorch-relevant info
@@ -325,6 +355,8 @@ def run_val(
     for step, (batch, batch_metadata) in enumerate(
         maybe_tqdm(val_dataloader, desc=f"Eval ({task.name}, {str(phase)})", verbose=verbose)
     ):
+        regular_log(logger, step, interval=10, tag=log_tag)
+
         batch = batch.to(device)
 
         with torch.no_grad():
@@ -390,6 +422,8 @@ def run_test(
     for step, (batch, batch_metadata) in enumerate(
         maybe_tqdm(test_dataloader, desc=f"Eval ({task.name}, Test)", verbose=verbose)
     ):
+        regular_log(logger, step, interval=10, tag='test')
+
         batch = batch.to(device)
 
         with torch.no_grad():

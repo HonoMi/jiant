@@ -41,6 +41,7 @@ class RunConfiguration(zconf.RunConfig):
     write_val_preds = zconf.attr(action="store_true")
     write_test_preds = zconf.attr(action="store_true")
     eval_every_steps = zconf.attr(type=int, default=0)
+    eval_every_epochs = zconf.attr(type=int, default=0)
     save_every_steps = zconf.attr(type=int, default=0)
     save_checkpoint_every_steps = zconf.attr(type=int, default=0)
     no_improvements_for_n_evals = zconf.attr(type=int, default=0)
@@ -161,7 +162,7 @@ def run_loop(args: RunConfiguration, checkpoint=None):
             metarunner = jiant_metarunner.JiantMetarunner(
                 runner=runner,
                 save_every_steps=args.save_every_steps,
-                eval_every_steps=args.eval_every_steps,
+                eval_every_steps=args.eval_every_steps or args.eval_every_epochs * jiant_task_container.global_train_config.steps_per_epoch,
                 save_checkpoint_every_steps=args.save_checkpoint_every_steps,
                 no_improvements_for_n_evals=args.no_improvements_for_n_evals,
                 checkpoint_saver=checkpoint_saver,

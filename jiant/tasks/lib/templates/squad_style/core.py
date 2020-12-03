@@ -18,6 +18,7 @@ from jiant.tasks.core import (
 )
 from jiant.utils.python.datastructures import ExtendedDataClassMixin
 from jiant.utils.display import maybe_tqdm
+from jiant.utils.logging import regular_log
 
 import logging
 
@@ -392,7 +393,9 @@ def generic_read_squad_examples(
 
     is_training = set_type == PHASE.TRAIN
     examples = []
-    for entry in maybe_tqdm(input_data, desc="Reading SQuAD Entries"):
+    for step, entry in enumerate(maybe_tqdm(input_data, desc="Reading SQuAD Entries")):
+        regular_log(logger, step)
+
         if read_title:
             title = entry["title"]
         else:

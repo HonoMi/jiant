@@ -2,12 +2,16 @@ import collections
 import math
 import re
 import string
+import logging
 
 from dataclasses import dataclass
 from typing import List, Dict
 
 from transformers.tokenization_bert import BasicTokenizer
 from jiant.utils.display import maybe_tqdm
+from jiant.utils.logging import regular_log
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -76,7 +80,9 @@ def compute_predictions_logits_v2(
     all_nbest_json = collections.OrderedDict()
     scores_diff_json = collections.OrderedDict()
 
-    for example in maybe_tqdm(partial_examples, verbose=verbose):
+    for step, example in enumerate(maybe_tqdm(partial_examples, verbose=verbose)):
+        regular_log(logger, step, interval=10)
+
         features = example.partial_features
 
         prelim_predictions = []
