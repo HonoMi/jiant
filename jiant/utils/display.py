@@ -6,8 +6,8 @@ logger = logging.getLogger(__name__)
 
 def tqdm(iterable=None, desc=None, total=None, initial=0, disable=True):
     if disable:
-        logger.info('----------------------------------   [%s]   ----------------------------------', desc)
-    return tqdm_lib.tqdm(iterable=iterable, desc=desc, total=total, initial=initial, disable=disable)
+        logger.info('------------------------------------- [%s] -------------------------------------', desc)
+    return tqdm_lib.tqdm(iterable=iterable, desc=desc, total=total, initial=initial,)
 
 
 def trange(*args, desc=None, total=None):
