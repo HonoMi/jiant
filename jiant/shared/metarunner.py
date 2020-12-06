@@ -20,7 +20,7 @@ class AbstractMetarunner:
     def should_eval_model(self) -> bool:
         raise NotImplementedError()
 
-    def eval_model(self):
+    def eval_model(self, log_to_tensorboard=True):
         raise NotImplementedError()
 
     def should_break_training(self) -> bool:
@@ -48,7 +48,7 @@ class AbstractMetarunner:
             if self.should_break_training():
                 break
 
-        self.eval_model()
+        self.eval_model(log_to_tensorboard=False)
         self.done_training()
 
         return self.returned_result()

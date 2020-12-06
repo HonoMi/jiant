@@ -1,8 +1,9 @@
-from typing import Dict
+from typing import Dict, Optional
 from dataclasses import dataclass
 import logging
 
 import torch
+from tensorboardX import SummaryWriter
 
 import jiant.tasks.evaluate as evaluate
 import jiant.utils.torch_utils as torch_utils
@@ -52,6 +53,7 @@ class JiantRunner:
         device,
         rparams: RunnerParameters,
         log_writer,
+        tf_writer: SummaryWriter,
     ):
         self.jiant_task_container = jiant_task_container
         self.jiant_model = jiant_model
@@ -59,6 +61,7 @@ class JiantRunner:
         self.device = device
         self.rparams = rparams
         self.log_writer = log_writer
+        self.tf_writer = tf_writer
 
         self.model = self.jiant_model
 
@@ -85,6 +88,10 @@ class JiantRunner:
             self.run_train_step(
                 train_dataloader_dict=train_dataloader_dict, train_state=train_state
             )
+
+            if step % 100 == 0:
+                self.tf_writer.flush()
+
             yield train_state
 
     def resume_train_context(self, train_state, verbose=True):
@@ -106,6 +113,10 @@ class JiantRunner:
             self.run_train_step(
                 train_dataloader_dict=train_dataloader_dict, train_state=train_state
             )
+
+            if step % 100 == 0:
+                self.tf_writer.flush()
+
             yield train_state
 
     def run_train_step(self, train_dataloader_dict: dict, train_state: TrainState):
@@ -130,33 +141,57 @@ class JiantRunner:
         self.optimizer_scheduler.optimizer.zero_grad()
 
         train_state.step(task_name=task_name)
+        loss_per_step = loss_val / task_specific_config.gradient_accumulation_steps
         self.log_writer.write_entry(
             "loss_train",
             {
                 "task": task_name,
                 "task_step": train_state.task_steps[task_name],
                 "global_step": train_state.global_steps,
-                "loss_val": loss_val / task_specific_config.gradient_accumulation_steps,
+                "loss_val": loss_per_step,
             },
         )
+        self.tf_writer.add_scalar(f'{task_name}/train-loss', loss_per_step, global_step=train_state.global_steps)
 
-    def run_train_eval(self, task_name_list, use_subset=None, return_preds=False, verbose=True):
+    def run_train_eval(self,
+                       task_name_list,
+                       global_step: Optional[int] = None,
+                       use_subset=None,
+                       return_preds=False,
+                       verbose=True):
         dataloader_dict = self.get_train_dataloader_dict(for_eval=True,)
         labels_dict = self.get_train_labels_dict(
             task_name_list=task_name_list, use_subset=use_subset
         )
-        return self._run_eval(task_name_list, dataloader_dict, labels_dict,
-                              phase=PHASE.TRAIN, use_subset=use_subset, return_preds=return_preds, log_tag='train')
+        return self._run_eval(task_name_list,
+                              dataloader_dict,
+                              labels_dict,
+                              global_step,
+                              phase=PHASE.TRAIN,
+                              use_subset=use_subset,
+                              return_preds=return_preds,
+                              split='train')
 
-    def run_val(self, task_name_list, use_subset=None, return_preds=False, verbose=True):
+    def run_val(self,
+                task_name_list,
+                global_step: Optional[int] = None,
+                use_subset=None,
+                return_preds=False,
+                verbose=True):
         dataloader_dict = self.get_val_dataloader_dict(
             task_name_list=task_name_list, use_subset=use_subset
         )
         labels_dict = self.get_val_labels_dict(
             task_name_list=task_name_list, use_subset=use_subset
         )
-        return self._run_eval(task_name_list, dataloader_dict, labels_dict,
-                              phase=PHASE.VAL, use_subset=use_subset, return_preds=return_preds, log_tag='valid')
+        return self._run_eval(task_name_list,
+                              dataloader_dict,
+                              labels_dict,
+                              global_step=global_step,
+                              phase=PHASE.VAL,
+                              use_subset=use_subset,
+                              return_preds=return_preds,
+                              split='valid')
 
     def run_test(self, task_name_list, use_subset=None, return_preds=False, verbose=True):
         dataloader_dict = self.get_test_dataloader_dict()
@@ -165,17 +200,18 @@ class JiantRunner:
         )
 
         return self._run_eval(task_name_list, dataloader_dict, labels_dict,
-                              phase=PHASE.TEST, use_subset=use_subset, return_preds=return_preds, log_tag='test')
+                              phase=PHASE.TEST, use_subset=use_subset, return_preds=return_preds, split='test')
 
     def _run_eval(self,
                   task_name_list,
                   dataloader_dict,
                   labels_dict,
+                  global_step: Optional[int] = None,
                   phase=None,
                   use_subset=None,
                   return_preds=False,
                   verbose=True,
-                  log_tag='valid'):
+                  split='valid'):
         evaluate_dict = {}
         for task_name in task_name_list:
             task = self.jiant_task_container.task_dict[task_name]
@@ -187,9 +223,11 @@ class JiantRunner:
                 task=task,
                 device=self.device,
                 local_rank=self.rparams.local_rank,
+                tf_writer=self.tf_writer,
+                global_step=global_step,
                 return_preds=return_preds,
                 verbose=verbose,
-                log_tag=log_tag,
+                split=split,
             )
         return evaluate_dict
 
@@ -333,11 +371,13 @@ def run_val(
     task,
     device,
     local_rank,
+    tf_writer: SummaryWriter,
+    global_step: Optional[int] = None,
     phase=None,
     return_preds=False,
     return_logits=True,
     verbose=True,
-    log_tag='valid',
+    split='valid',
 ):
     # Reminder:
     #   val_dataloader contains mostly PyTorch-relevant info
@@ -355,7 +395,7 @@ def run_val(
     for step, (batch, batch_metadata) in enumerate(
         maybe_tqdm(val_dataloader, desc=f"Eval ({task.name}, {str(phase)})", verbose=verbose)
     ):
-        regular_log(logger, step, interval=10, tag=log_tag)
+        regular_log(logger, step, interval=10, tag=split)
 
         batch = batch.to(device)
 
@@ -383,23 +423,36 @@ def run_val(
     output = {
         "accumulator": eval_accumulator,
     }
+
     if has_labels:
         tokenizer = (
             jiant_model.tokenizer
             if not torch_utils.is_data_parallel(jiant_model) else jiant_model.module.tokenizer
         )
+        metrics = evaluation_scheme.compute_metrics_from_accumulator(
+            task=task, accumulator=eval_accumulator, labels=val_labels, tokenizer=tokenizer,
+        )
+
         output.update({
             "loss": eval_loss,
-            "metrics": evaluation_scheme.compute_metrics_from_accumulator(
-                task=task, accumulator=eval_accumulator, labels=val_labels, tokenizer=tokenizer,
-            ),
+            "metrics": metrics,
         })
+
+        if global_step is not None:
+            for metric_name, metric_value in metrics.minor.items():
+                tf_writer.add_scalar(f'{split}/{metric_name}', metric_value, global_step=global_step)
+
     if return_preds:
         output["preds"] = evaluation_scheme.get_preds_from_accumulator(
             task=task, accumulator=eval_accumulator,
         )
         if isinstance(eval_accumulator, evaluate.ConcatenateLogitsAccumulator) and return_logits:
             output["logits"] = eval_accumulator.get_accumulated()
+
+    if global_step is not None:
+        tf_writer.add_scalar(f'{split}/loss', eval_loss, global_step=global_step)
+
+    tf_writer.flush()
     return output
 
 

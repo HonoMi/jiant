@@ -76,6 +76,7 @@ setup(
         "machine_learning@git+https://github.com/HonoMi/machine-learning.git@master",
         "torchsampler@git+https://github.com/HonoMi/torchsampler.git@master",
         "datasets_extra@git+https://github.com/HonoMi/datasets-extra.git@master",
+        "tensorboardX",
     ],
     extras_require=extras,
     python_requires=">=3.6.0",

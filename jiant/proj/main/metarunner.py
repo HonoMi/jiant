@@ -1,7 +1,10 @@
 from dataclasses import dataclass
 from typing import Dict
 import torch.nn as nn
+import logging
+import pprint
 
+from tensorboardX import SummaryWriter
 
 import jiant.proj.main.runner as jiant_runner
 import jiant.proj.main.components.task_sampler as jiant_task_sampler
@@ -14,6 +17,8 @@ from jiant.utils.python.functional import always_false
 from jiant.utils.torch_utils import copy_state_dict, CPU_DEVICE, get_model_for_saving
 from jiant.utils.zlog import BaseZLogger, PRINT_LOGGER
 from jiant.shared.metarunner import AbstractMetarunner
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -67,6 +72,7 @@ class JiantMetarunner(AbstractMetarunner):
         save_best_model: bool = True,
         load_best_model: bool = True,
         log_writer: BaseZLogger = PRINT_LOGGER,
+        tf_writer: SummaryWriter = None,
     ):
         self.runner = runner
         self.save_every_steps = save_every_steps
@@ -79,6 +85,7 @@ class JiantMetarunner(AbstractMetarunner):
         self.save_best_model = save_best_model
         self.load_best_model = load_best_model
         self.log_writer = log_writer
+        self.tf_writer = tf_writer
 
         self.best_val_state = None
         self.best_state_dict = None
@@ -87,6 +94,7 @@ class JiantMetarunner(AbstractMetarunner):
         self.full_break = False
         self.single_use_check = False
         self.num_evals_since_improvement = 0
+        self.num_evals = 0
 
         self.model = self.runner.model
         self.device = self.runner.device
@@ -138,8 +146,8 @@ class JiantMetarunner(AbstractMetarunner):
             return False
         return (self.train_state.global_steps + 1) % self.eval_every_steps == 0
 
-    def eval_model(self):
-        self.eval_save()
+    def eval_model(self, log_to_tensorboard=True):
+        self.eval_save(log_to_tensorboard=log_to_tensorboard)
 
     def should_break_training(self) -> bool:
         if compare_steps_max_steps(
@@ -154,6 +162,8 @@ class JiantMetarunner(AbstractMetarunner):
                     {"message": "early_stopped", "train_state": self.train_state.to_dict()},
                 )
                 self.log_writer.flush()
+                logger.info('-- early stopped! --')
+                logger.info('%s', pprint.pformat(self.train_state.to_dict()))
                 return True
 
         return False
@@ -196,11 +206,14 @@ class JiantMetarunner(AbstractMetarunner):
         self.best_state_dict = metarunner_state["best_state_dict"]
         self.train_state = metarunner_state["train_state"]
 
-    def eval_save(self):
+    def eval_save(self, log_to_tensorboard=True):
         self.num_evals_since_improvement += 1
+        if log_to_tensorboard:
+            self.num_evals += 1
         val_results_dict = self.runner.run_val(
             task_name_list=self.runner.jiant_task_container.task_run_config.train_val_task_list,
             use_subset=True,
+            global_step=self.num_evals - 1 if log_to_tensorboard else None,
         )
         aggregated_major = jiant_task_sampler.compute_aggregate_major_metrics_from_results_dict(
             metrics_aggregator=self.runner.jiant_task_container.metrics_aggregator,

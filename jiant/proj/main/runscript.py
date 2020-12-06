@@ -133,6 +133,7 @@ def setup_runner(
         device=quick_init_out.device,
         rparams=rparams,
         log_writer=quick_init_out.log_writer,
+        tf_writer=quick_init_out.tf_writer,
     )
     return runner
 
@@ -171,6 +172,7 @@ def run_loop(args: RunConfiguration, checkpoint=None):
                 save_best_model=args.do_save,
                 load_best_model=True,
                 log_writer=quick_init_out.log_writer,
+                tf_writer=quick_init_out.tf_writer,
             )
             if is_resumed:
                 metarunner.load_state(checkpoint["metarunner_state"])
@@ -187,6 +189,7 @@ def run_loop(args: RunConfiguration, checkpoint=None):
             train_eval_results_dict = runner.run_train_eval(
                 task_name_list=runner.jiant_task_container.task_run_config.train_task_list,
                 return_preds=args.write_train_preds,
+                global_step=None,
             )
             jiant_evaluate.write_train_eval_results(
                 results_dict=train_eval_results_dict,
@@ -203,19 +206,19 @@ def run_loop(args: RunConfiguration, checkpoint=None):
             assert not args.write_val_preds
 
         if args.do_val:
-            train_eval_results_dict = runner.run_val(
+            val_results_dict = runner.run_val(
                 task_name_list=runner.jiant_task_container.task_run_config.val_task_list,
                 return_preds=args.write_val_preds,
             )
             jiant_evaluate.write_val_results(
-                results_dict=train_eval_results_dict,
+                results_dict=val_results_dict,
                 metrics_aggregator=runner.jiant_task_container.metrics_aggregator,
                 output_dir=args.output_dir,
                 verbose=True,
             )
             if args.write_val_preds:
                 jiant_evaluate.write_preds(
-                    eval_results_dict=train_eval_results_dict,
+                    eval_results_dict=val_results_dict,
                     path=os.path.join(args.output_dir, "val_preds.p"),
                 )
         else:

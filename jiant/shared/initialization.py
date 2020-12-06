@@ -7,6 +7,8 @@ import torch
 from dataclasses import dataclass
 from typing import Any
 
+from tensorboardX import SummaryWriter
+
 import jiant.utils.python.io as py_io
 import jiant.utils.zlog as zlog
 
@@ -16,6 +18,7 @@ class QuickInitContainer:
     device: Any
     n_gpu: int
     log_writer: Any
+    tf_writer: SummaryWriter
 
 
 def quick_init(args, verbose=True) -> QuickInitContainer:
@@ -38,8 +41,9 @@ def quick_init(args, verbose=True) -> QuickInitContainer:
     args.seed = init_seed(given_seed=args.seed, n_gpu=n_gpu, verbose=verbose)
     init_output_dir(output_dir=args.output_dir, force_overwrite=args.force_overwrite)
     log_writer = init_log_writer(output_dir=args.output_dir)
+    tf_writer = SummaryWriter(os.path.join(args.output_dir, 'tensorflow_log'))
     save_args(args=args, verbose=verbose)
-    return QuickInitContainer(device=device, n_gpu=n_gpu, log_writer=log_writer)
+    return QuickInitContainer(device=device, n_gpu=n_gpu, log_writer=log_writer, tf_writer=tf_writer)
 
 
 def init_server_logging(server_ip, server_port, verbose=True):
