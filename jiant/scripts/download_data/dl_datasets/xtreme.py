@@ -13,7 +13,6 @@ import jiant.utils.python.datastructures as datastructures
 import jiant.utils.python.io as py_io
 import jiant.utils.python.filesystem as filesystem
 import jiant.utils.python.strings as strings
-from jiant.utils.logging import regular_log
 
 logger = logging.getLogger(__name__)
 
@@ -192,9 +191,7 @@ def download_udpos_data_and_write_config(task_data_base_path: str, task_config_b
     conll_path = os.path.join(udpos_temp_path, "conll")
 
     # === Convert conllu files to conll === #
-    for step, input_path in enumerate(display.tqdm(conllu_path_ls, desc="Convert conllu files to conll format")):
-        regular_log(logger, step)
-
+    for input_path in display.tqdm(conllu_path_ls, desc="Convert conllu files to conll format"):
         input_path_fol, input_path_file = os.path.split(input_path)
         lang = input_path_file.split("_")[0]
         os.makedirs(os.path.join(conll_path, lang), exist_ok=True)
@@ -237,9 +234,7 @@ def download_udpos_data_and_write_config(task_data_base_path: str, task_config_b
         )
 
     # === Convert conll to final format === #
-    for step, lang in enumerate(display.tqdm(languages, desc="Convert conll to final format")):
-        regular_log(logger, step)
-
+    for lang in display.tqdm(languages, desc="Convert conll to final format"):
         task_name = f"udpos_{lang}"
         task_data_path = os.path.join(task_data_base_path, task_name)
         os.makedirs(task_data_path, exist_ok=True)

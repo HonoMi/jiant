@@ -3,7 +3,8 @@ import argparse
 
 import jiant.utils.python.io as py_io
 import jiant.scripts.download_data.dl_datasets.hf_datasets_tasks as hf_datasets_tasks_download
-import jiant.scripts.download_data.dl_datasets.xtreme as xtreme_download
+# import jiant.scripts.download_data.dl_datasets.xtreme as xtreme_download  # XXX: 20201204 変なエラーを吐くので，実験期間中は一旦，排除する．
+xtreme_download = None
 import jiant.scripts.download_data.dl_datasets.files_tasks as files_tasks_download
 from jiant.tasks.constants import (
     GLUE_TASKS,
