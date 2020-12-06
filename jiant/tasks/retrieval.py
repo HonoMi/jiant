@@ -1,6 +1,7 @@
 import os
 from typing import Optional
 import re
+import logging
 
 from jiant.tasks.lib.abductive_nli import AbductiveNliTask
 from jiant.tasks.lib.acceptability_judgement.definiteness import AcceptabilityDefinitenessTask
@@ -72,6 +73,8 @@ from jiant.tasks.lib.arct import ArctTask
 from jiant.tasks.core import Task
 from jiant.utils.python.io import read_json
 from jiant.scripts.download_data.cross_validation import is_task
+
+logger = logging.getLogger(__name__)
 
 
 TASK_DICT = {
@@ -180,9 +183,9 @@ def create_task_from_config(config: dict, base_path: Optional[str] = None, verbo
             config["paths"][k] = os.path.join(base_path, path)
     task_kwargs = config.get("kwargs", {})
     if verbose:
-        print(task_class.__name__)
+        logger.info(task_class.__name__)
         for k, v in config["paths"].items():
-            print(f"  [{k}]: {v}")
+            logger.info(f"  [{k}]: {v}")
     # noinspection PyArgumentList
     return task_class(name=config["name"], path_dict=config["paths"], **task_kwargs)
 

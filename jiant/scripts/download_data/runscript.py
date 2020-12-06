@@ -1,5 +1,6 @@
 import os
 import argparse
+import logging
 
 import jiant.utils.python.io as py_io
 import jiant.scripts.download_data.dl_datasets.hf_datasets_tasks as hf_datasets_tasks_download
@@ -20,6 +21,8 @@ from jiant.scripts.download_data.cross_validation import parse_cv_task_name
 # implementation differs from the original dataset format
 HF_DATASETS_TASKS = (GLUE_TASKS | SUPERGLUE_TASKS | OTHER_HF_DATASETS_TASKS) - DIRECT_DOWNLOAD_TASKS
 SUPPORTED_TASKS = HF_DATASETS_TASKS | XTREME_TASKS | SQUAD_TASKS | DIRECT_DOWNLOAD_TASKS
+
+logger = logging.getLogger(__name__)
 
 
 # noinspection PyUnusedLocal
@@ -83,7 +86,7 @@ def download_data(task_names, output_base_path):
             )
         else:
             raise KeyError()
-        print(f"Downloaded and generated configs for '{cv_task_name}' ({i+1}/{len(task_names)})")
+        logger.info(f"Downloaded and generated configs for '{cv_task_name}' ({i+1}/{len(task_names)})")
 
 
 def main():

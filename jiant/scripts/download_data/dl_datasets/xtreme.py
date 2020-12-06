@@ -142,7 +142,7 @@ def download_udpos_data_and_write_config(task_data_base_path: str, task_config_b
                                     newline = "\n" if idx != len(data[split]) - 1 else ""
                                     fout.write("{}\t{}{}".format(" ".join(sent), " ".join(tag), newline))
                             check_file(prefix + ".mt.tsv")
-                            print("    - finish checking " + prefix + ".mt.tsv")
+                            logger.info("    - finish checking " + prefix + ".mt.tsv")
                 elif suffix == "tsv":
                     path = prefix + ".tsv"
                     if os.path.exists(path):
@@ -169,7 +169,7 @@ def download_udpos_data_and_write_config(task_data_base_path: str, task_config_b
                                 for line in lines:
                                     fout.write(line.strip() + "\n")
                                 fout.write("\n")
-                print(f"finish writing file to {prefix}.{suffix}")
+                logger.info(f"finish writing file to {prefix}.{suffix}")
 
     languages = (
         "af ar bg de el en es et eu fa fi fr he hi hu id it ja "

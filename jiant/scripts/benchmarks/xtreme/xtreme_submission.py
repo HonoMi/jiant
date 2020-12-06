@@ -133,7 +133,7 @@ def generate_and_write_preds_for_classification(
     """Write test predictions for classification tasks in XTREME submission format"""
     preds_pickle_path = os.path.join(output_dir, f"{supertask}_test_preds.p")
     if skip_if_done and os.path.exists(preds_pickle_path):
-        print(f"Skipping cause {preds_pickle_path} exists")
+        logger.info(f"Skipping cause {preds_pickle_path} exists")
         return
 
     test_results_dict = runner.run_test(
@@ -157,7 +157,7 @@ def generate_and_write_preds_for_classification(
                 else:
                     raise RuntimeError()
                 f.write(f"{pred_label}\n")
-    print(f"Wrote {supertask} preds for {len(test_results_dict)} languages")
+    logger.info(f"Wrote {supertask} preds for {len(test_results_dict)} languages")
 
 
 def generate_and_write_preds_for_tagging(
@@ -166,7 +166,7 @@ def generate_and_write_preds_for_tagging(
     """Generate and write test predictions for tagging tasks in XTREME submission format"""
     preds_pickle_path = os.path.join(output_dir, f"{supertask}_test_preds.p")
     if skip_if_done and os.path.exists(preds_pickle_path):
-        print(f"Skipping cause {preds_pickle_path} exists")
+        logger.info(f"Skipping cause {preds_pickle_path} exists")
         return
 
     test_dataloader_dict = runner.get_test_dataloader_dict()
@@ -187,7 +187,7 @@ def generate_and_write_preds_for_tagging(
                     f.write(f"{label}\n")
                 f.write("\n")
     torch.save(preds_dict, preds_pickle_path)
-    print(
+    logger.info(
         f"Wrote {supertask} preds for"
         f" {len(runner.jiant_task_container.task_run_config.test_task_list)} languages"
     )
@@ -241,7 +241,7 @@ def generate_and_write_preds_for_qa(
     """Generate predictions (test) for QA tasks and write them in XTREME submission format"""
     preds_pickle_path = os.path.join(output_dir, f"{supertask}_test_preds.p")
     if skip_if_done and os.path.exists(preds_pickle_path):
-        print(f"Skipping cause {preds_pickle_path} exists")
+        logger.info(f"Skipping cause {preds_pickle_path} exists")
         return
 
     if phase == "val":
@@ -309,7 +309,7 @@ def generate_and_write_preds_for_qa(
         task = runner.jiant_task_container.task_dict[task_name]
         lang = get_qa_language(supertask=supertask, task=task)
         py_io.write_json(task_results["preds"], os.path.join(preds_output_dir, f"test-{lang}.json"))
-    print(f"Wrote {supertask} preds for {len(test_results_dict)} languages")
+    logger.info(f"Wrote {supertask} preds for {len(test_results_dict)} languages")
 
 
 def get_qa_language(supertask: str, task):
@@ -330,10 +330,10 @@ def generate_and_write_preds_for_bucc2018(
     """Generate predictions (test) for Bucc2018 and write them in XTREME submission format"""
     preds_pickle_path = os.path.join(output_dir, "bucc2018_test_preds.p")
     if skip_if_done and os.path.exists(preds_pickle_path):
-        print(f"Skipping cause {preds_pickle_path} exists")
+        logger.info(f"Skipping cause {preds_pickle_path} exists")
         return
     else:
-        print(f"{preds_pickle_path} does not exist")
+        logger.info(f"{preds_pickle_path} does not exist")
     if bucc_val_metrics_path is None:
         # Recompute thresholds:
         val_results_dict = runner.run_val(
@@ -371,14 +371,14 @@ def generate_and_write_preds_for_bucc2018(
         with open(os.path.join(preds_output_dir, f"test-{lang}.tsv"), "w") as f:
             for src, trg in bitext:
                 f.write(f"{src}\t{trg}\n")
-    print(f"Wrote Bucc2018 preds for {len(test_results_dict)} languages")
+    logger.info(f"Wrote Bucc2018 preds for {len(test_results_dict)} languages")
 
 
 def generate_and_write_preds_for_tatoeba(runner, output_dir: str, skip_if_done: bool = False):
     """Generate predictions (val) for Tateoba and write them in XTREME submission format"""
     preds_pickle_path = os.path.join(output_dir, "tatoeba_val_preds.p")
     if skip_if_done and os.path.exists(preds_pickle_path):
-        print(f"Skipping cause {preds_pickle_path} exists")
+        logger.info(f"Skipping cause {preds_pickle_path} exists")
         return
     val_results_dict = runner.run_val(
         task_name_list=runner.jiant_task_container.task_run_config.val_task_list, return_preds=True,
@@ -393,7 +393,7 @@ def generate_and_write_preds_for_tatoeba(runner, output_dir: str, skip_if_done: 
         with open(os.path.join(preds_output_dir, f"test-{lang}.tsv"), "w") as f:
             for idx in task_results["preds"]:
                 f.write(f"{idx:d}\n")
-    print(f"Wrote Tatoeba preds for {len(val_results_dict)} languages")
+    logger.info(f"Wrote Tatoeba preds for {len(val_results_dict)} languages")
 
 
 def main():

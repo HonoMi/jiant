@@ -2,12 +2,14 @@ import os
 import time
 import torch
 import traceback
+import logging
 
 from contextlib import contextmanager
 
 import jiant.utils.python.io as py_io
 import jiant.utils.python.filesystem as filesystem
 
+logger = logging.getLogger(__name__)
 
 class BaseZLogger:
     def log_context(self):
@@ -53,7 +55,7 @@ class ZLogger(BaseZLogger):
         entry["TIMESTAMP"] = time.time()
         self._write_entry_to_file(key=key, entry=entry)
         if do_print:
-            print(entry)
+            logger.info(entry.__repr__())
 
     def write_obj(self, key, obj, entry):
         assert "DATA" not in entry
@@ -169,10 +171,10 @@ class _PrintZLogger(BaseZLogger):
         yield
 
     def write_entry(self, key, entry):
-        print(f"{key}: {entry}")
+        logger.info(f"{key.__repr__()}: {entry.__repr__()}")
 
     def write_obj(self, key, obj, entry):
-        print(f"{key}: {obj}")
+        logger.info(f"{key.__repr__()}: {obj.__repr__()}")
 
     def flush(self):
         pass

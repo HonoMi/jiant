@@ -1,6 +1,7 @@
 import itertools
 import json
 from dataclasses import dataclass
+import logging
 
 import numpy as np
 import pandas as pd
@@ -21,6 +22,8 @@ from jiant.tasks.lib.templates import mlm as mlm_template
 from jiant.utils.python.datastructures import ExtendedDataClassMixin
 from jiant.utils.python.io import read_json
 from jiant.utils.string_comparing import string_f1_score, exact_match_score
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -1067,6 +1070,6 @@ def write_metrics(results, output_path, verbose=True):
     assert results_to_write
     metrics_str = json.dumps(results_to_write, indent=2)
     if verbose:
-        print(metrics_str)
+        logger.info(metrics_str)
     with open(output_path, "w") as f:
         f.write(metrics_str)

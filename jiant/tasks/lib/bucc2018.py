@@ -3,6 +3,7 @@ import numpy as np
 import torch
 from dataclasses import dataclass
 from typing import List
+import logging
 
 from jiant.tasks.core import (
     BaseExample,
@@ -17,6 +18,8 @@ from jiant.tasks.lib.templates.shared import (
     create_input_set_from_tokens_and_segments,
 )
 from jiant.utils.python.io import read_file, read_file_lines
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -256,7 +259,7 @@ def bucc_eval(candidates2score, gold, threshold=None):
     # Adapted From: https://github.com/google-research/xtreme/blob/
     #               522434d1aece34131d997a97ce7e9242a51a688a/third_party/utils_retrieve.py
     if threshold is not None:
-        print(" - using threshold {}".format(threshold))
+        logger.info(" - using threshold {}".format(threshold))
     else:
         threshold = bucc_optimize(candidates2score, gold)
 

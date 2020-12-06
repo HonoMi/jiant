@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from typing import Dict, List, Optional
-
+import logging
 
 import jiant.proj.main.components.task_sampler as jiant_task_sampler
 import jiant.shared.caching as caching
@@ -8,6 +8,7 @@ import jiant.tasks as tasks
 import jiant.utils.python.io as py_io
 from jiant.utils.python.datastructures import ExtendedDataClassMixin
 
+logger = logging.getLogger(__name__)
 
 @dataclass
 class TaskSpecificConfig(ExtendedDataClassMixin):
@@ -80,10 +81,10 @@ def create_task_dict(task_config_dict: dict, verbose: bool = True) -> Dict[str, 
         for task_name, task_config_path in task_config_dict.items()
     }
     if verbose:
-        print("Creating Tasks:")
+        logger.info("Creating Tasks:")
         for task_name, task_config_path in task_config_dict.items():
             task_class = task_dict[task_name].__class__.__name__
-            print(f"    {task_name} ({task_class}): {task_config_path}")
+            logger.info(f"    {task_name} ({task_class}): {task_config_path}")
     return task_dict
 
 

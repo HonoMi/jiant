@@ -1,8 +1,11 @@
 import transformers
 import torch
+import logging
 
 from jiant.ext.radam import RAdam
 from jiant.shared.model_resolution import ModelArchitectures, resolve_tokenizer_class
+
+logger = logging.getLogger(__name__)
 
 
 def get_tokenizer(model_type, tokenizer_path):
@@ -105,10 +108,10 @@ def create_optimizer_from_params(
         "weighted_sum.weights",
     ]
     if verbose:
-        print("No optimizer decay for:")
+        logger.info("No optimizer decay for:")
         for n, p in named_parameters:
             if any(nd in n for nd in no_decay):
-                print(f"  {n}")
+                logger.info(f"  {n}")
 
     used_named_parameters = [
         (n, p) for n, p in named_parameters if p.requires_grad and "weighted_sum.weights" not in n
@@ -131,13 +134,13 @@ def create_optimizer_from_params(
 
     if optimizer_type == "adam":
         if verbose:
-            print("Using AdamW")
+            logger.info("Using AdamW")
         optimizer = transformers.AdamW(
             optimizer_grouped_parameters, lr=learning_rate, eps=optimizer_epsilon
         )
     elif optimizer_type == "radam":
         if verbose:
-            print("Using RAdam")
+            logger.info("Using RAdam")
         optimizer = RAdam(optimizer_grouped_parameters, lr=learning_rate, eps=optimizer_epsilon)
     else:
         raise KeyError(optimizer_type)

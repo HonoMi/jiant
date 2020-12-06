@@ -123,7 +123,7 @@ def partition_list(ls, n, strict=False):
     if strict:
         assert length % n == 0
     parts_per = math.ceil(length / n)
-    print(parts_per)
+    # print(parts_per)
     result = []
     for i in range(n):
         result.append(ls[i * parts_per : (i + 1) * parts_per])

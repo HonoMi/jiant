@@ -3,10 +3,13 @@ import re
 import sys
 import unicodedata
 from collections import Counter
+import logging
 
 from dataclasses import dataclass
 
 from jiant.tasks.lib.templates.squad_style import core as squad_style_template
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -171,7 +174,7 @@ def evaluate(dataset, predictions, lang):
                 total += 1
                 if qa["id"] not in predictions:
                     message = "Unanswered question " + qa["id"] + " will receive score 0."
-                    print(message, file=sys.stderr)
+                    logger.info(message, file=sys.stderr)
                     continue
                 ground_truths = list(map(lambda x: x["text"], qa["answers"]))
                 prediction = predictions[qa["id"]]

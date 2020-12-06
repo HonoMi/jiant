@@ -138,7 +138,7 @@ class JiantMetarunner(AbstractMetarunner):
     def save_checkpoint(self):
         runner_state = self.runner.get_runner_state()
         metarunner_state = self.get_state()
-        print("Saving State")
+        logger.info("Saving State")
         self.checkpoint_saver.save(runner_state=runner_state, metarunner_state=metarunner_state)
 
     def should_eval_model(self) -> bool:
@@ -172,7 +172,7 @@ class JiantMetarunner(AbstractMetarunner):
         self.eval_save()
         if self.load_best_model and self.best_state_dict is not None:
             if self.verbose:
-                print("Loading Best")
+                logger.info("Loading Best")
             copied_state_dict = copy_state_dict(
                 state_dict=self.best_state_dict,
                 target_device=None,  # Why was this required?

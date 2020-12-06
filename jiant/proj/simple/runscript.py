@@ -1,4 +1,5 @@
 import os
+import logging
 
 import torch
 
@@ -11,6 +12,8 @@ import jiant.shared.distributed as distributed
 import jiant.utils.zconf as zconf
 import jiant.utils.python.io as py_io
 from jiant.utils.python.logic import replace_none
+
+logger = logging.getLogger(__name__)
 
 
 @zconf.run_config
@@ -121,7 +124,7 @@ def run_simple(args: RunConfiguration, with_continue: bool = False):
 
         # === Step 2: Download models === #
         if not os.path.exists(os.path.join(model_cache_path, args.model_type)):
-            print("Downloading model")
+            logger.info("Downloading model")
             export_model.lookup_and_export_model(
                 model_type=args.model_type,
                 output_base_path=os.path.join(model_cache_path, args.model_type),
@@ -142,7 +145,7 @@ def run_simple(args: RunConfiguration, with_continue: bool = False):
                     phases_to_do.append(phase)
             if not phases_to_do:
                 continue
-            print(f"Tokenizing Task '{task_name}' for phases '{','.join(phases_to_do)}'")
+            logger.info(f"Tokenizing Task '{task_name}' for phases '{','.join(phases_to_do)}'")
             tokenize_and_cache.main(
                 tokenize_and_cache.RunConfiguration(
                     task_config_path=task_config_path_dict[task_name],
@@ -200,11 +203,11 @@ def run_simple(args: RunConfiguration, with_continue: bool = False):
         and os.path.exists(os.path.join(run_output_dir, "checkpoint.p"))
         and with_continue
     ):
-        print("Resuming")
+        logger.info("Resuming")
         checkpoint = torch.load(os.path.join(run_output_dir, "checkpoint.p"))
         run_args = runscript.RunConfiguration.from_dict(checkpoint["metadata"]["args"])
     else:
-        print("Running from start")
+        logger.info("Running from start")
         run_args = runscript.RunConfiguration(
             # === Required parameters === #
             jiant_task_container_config_path=jiant_task_container_config_path,

@@ -2,10 +2,12 @@ import math
 import numpy as np
 import os
 from typing import Generator, Union, Sequence
+import logging
 
 import torch
 import torch.utils.data.dataset
 
+logger = logging.getLogger(__name__)
 
 class Chunker:
     def __init__(self, length, num_chunks, chunk_size):
@@ -195,7 +197,7 @@ class ChunkedFilesDataCache(DataCache):
             selected_chunk_sub_index_arr = chunk_sub_index_arr[selector]
             selected_reverse_index = reverse_index[selector]
             if verbose:
-                print(f"Loading {len(selected_chunk_sub_index_arr)} indices from chunk {chunk_i}")
+                logger.info(f"Loading {len(selected_chunk_sub_index_arr)} indices from chunk {chunk_i}")
             for i, j in zip(selected_chunk_sub_index_arr, selected_reverse_index):
                 result[j] = chunk[i]
             del chunk
@@ -250,7 +252,7 @@ class ChunkedFilesIterableDataset(torch.utils.data.dataset.IterableDataset):
         buffer_chunked_indices = self.get_buffer_chunked_indices()
         for buffer_chunked_index in buffer_chunked_indices:
             if self.verbose:
-                print(
+                logger.info(
                     f"Loading buffer {seen} - {seen + len(buffer_chunked_index)}"
                     f" out of {len(self)}"
                 )

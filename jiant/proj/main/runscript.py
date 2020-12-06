@@ -141,7 +141,6 @@ def setup_runner(
 def run_loop(args: RunConfiguration, checkpoint=None):
     is_resumed = checkpoint is not None
     quick_init_out = initialization.quick_init(args=args, verbose=True)
-    print(quick_init_out.n_gpu)
     with quick_init_out.log_writer.log_context():
         jiant_task_container = container_setup.create_jiant_task_container_from_json(
             jiant_task_container_config_path=args.jiant_task_container_config_path, verbose=True,
@@ -265,15 +264,15 @@ def run_with_continue(cl_args):
     if os.path.exists(os.path.join(run_args.output_dir, "done_file")) or os.path.exists(
         os.path.join(run_args.output_dir, "val_metrics.json")
     ):
-        print("Already Done")
+        logger.info("Already Done")
         return
     elif run_args.save_checkpoint_every_steps and os.path.exists(
         os.path.join(run_args.output_dir, "checkpoint.p")
     ):
-        print("Resuming")
+        logger.info("Resuming")
         resume(os.path.join(run_args.output_dir, "checkpoint.p"))
     else:
-        print("Running from start")
+        logger.info("Running from start")
         run_loop(args=run_args)
 
 

@@ -1,7 +1,11 @@
+import logging
+
 import jiant.proj.main.scripts.configurator as configurator
 import jiant.utils.zconf as zconf
 import jiant.utils.python.io as py_io
 from jiant.utils.python.datastructures import get_unique_list_in_order
+
+logger = logging.getLogger(__name__)
 
 
 LANGS_DICT = {
@@ -89,10 +93,10 @@ def generate_configs(args: RunConfiguration):
         test_task_name_list = xtreme_task_name_list
 
     if not args.suppress_print:
-        print("Training on:", ", ".join(train_task_name_list))
-        print("Validation on:", ", ".join(val_task_name_list))
-        print("Early stopping on:", ", ".join(train_val_task_name_list))
-        print("Testing on:", ",".join(test_task_name_list))
+        logger.info("Training on:", ", ".join(train_task_name_list))
+        logger.info("Validation on:", ", ".join(val_task_name_list))
+        logger.info("Early stopping on:", ", ".join(train_val_task_name_list))
+        logger.info("Testing on:", ",".join(test_task_name_list))
 
     config = configurator.SimpleAPIMultiTaskConfigurator(
         task_config_base_path=args.task_config_base_path,
@@ -115,7 +119,7 @@ def generate_configs(args: RunConfiguration):
         k: xtreme_task for k, v in config["taskmodels_config"]["task_to_taskmodel_map"].items()
     }
     if not args.suppress_print:
-        print(f"Assigning all tasks to '{xtreme_task}' head")
+        logger.info(f"Assigning all tasks to '{xtreme_task}' head")
     if xtreme_task in UNTRAINED_TASKS:
         # The reference implementation from the XTREME paper uses layer 14 for the
         #  retrieval representation.

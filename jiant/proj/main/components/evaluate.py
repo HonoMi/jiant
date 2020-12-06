@@ -1,6 +1,7 @@
 import json
 import os
 import numpy as np
+import logging
 
 import torch
 import pandas as pd
@@ -9,6 +10,8 @@ import jiant.utils.python.io as py_io
 import jiant.proj.main.components.task_sampler as jiant_task_sampler
 
 from machine_learning.dataset.preprocessing.pandas_dataframe import jsonify as jsonify_df
+
+logger = logging.getLogger(__name__)
 
 
 def write_train_eval_results(results_dict, metrics_aggregator, output_dir, verbose=True):
@@ -39,7 +42,7 @@ def _write_results(split: str, results_dict, metrics_aggregator, output_dir, ver
 
     metrics_str = json.dumps(full_results_to_write, indent=2)
     if verbose:
-        print(metrics_str)
+        logger.info(metrics_str)
 
     py_io.write_json(data=full_results_to_write, path=os.path.join(output_dir, f"{split}_metrics.json"))
 

@@ -1,4 +1,5 @@
 import json
+import logging
 import numpy as np
 import os
 import random
@@ -12,6 +13,8 @@ from tensorboardX import SummaryWriter
 import jiant.utils.python.io as py_io
 import jiant.utils.zlog as zlog
 
+
+logger = logging.getLogger(__name__)
 
 @dataclass
 class QuickInitContainer:
@@ -60,7 +63,7 @@ def init_server_logging(server_ip, server_port, verbose=True):
         import ptvsd
 
         if verbose:
-            print("Waiting for debugger attach")
+            logger.info("Waiting for debugger attach")
         ptvsd.enable_attach(address=(server_ip, server_port), redirect_output=True)
         ptvsd.wait_for_attach()
 
@@ -100,7 +103,7 @@ def init_cuda_from_args(no_cuda, local_rank, fp16, verbose=True):
         # noinspection PyUnresolvedReferences
         torch.distributed.init_process_group(backend="nccl")
     if verbose:
-        print(
+        logger.info(
             "device: {} n_gpu: {}, distributed training: {}, 16-bits training: {}".format(
                 device, n_gpu, bool(local_rank != -1), fp16
             )
@@ -130,7 +133,7 @@ def init_seed(given_seed, n_gpu, verbose=True):
     np.random.seed(used_seed)
     torch.manual_seed(used_seed)
     if verbose:
-        print("Using seed: {}".format(used_seed))
+        logger.info("Using seed: {}".format(used_seed))
 
     if n_gpu > 0:
         # noinspection PyUnresolvedReferences
@@ -162,7 +165,7 @@ def init_log_writer(output_dir):
 
 def print_args(args):
     for k, v in vars(args).items():
-        print("  {}: {}".format(k, v))
+        logger.info("  {}: {}".format(k, v))
 
 
 def save_args(args, verbose=True):
@@ -177,7 +180,7 @@ def save_args(args, verbose=True):
     with open(os.path.join(args.output_dir, "args.json"), "w") as f:
         f.write(formatted_args)
     if verbose:
-        print(formatted_args)
+        logger.info(formatted_args)
 
 
 def get_seed(seed):
