@@ -97,6 +97,8 @@ class SingleTaskConfigurator(zconf.RunConfig):
     train_loss_weights = zconf.attr(type=str, default=None)
     weighted_sampling_start_step = zconf.attr(type=int, default=0)  # zero start
     weighted_sampling_start_epoch = zconf.attr(type=int, default=0)  # zero start
+    weighted_loss_start_step = zconf.attr(type=int, default=0)  # zero start
+    weighted_loss_start_epoch = zconf.attr(type=int, default=0)  # zero start
     fix_seed_for_weighted_sampler = zconf.attr(action="store_true")
     epochs = zconf.attr(type=int, default=None)
     max_steps = zconf.attr(type=int, default=None)
@@ -167,6 +169,9 @@ class SingleTaskConfigurator(zconf.RunConfig):
         if self.weighted_sampling_start_step == 0:
             self.weighted_sampling_start_step = self.weighted_sampling_start_epoch * steps_per_epoch
 
+        if self.weighted_loss_start_step == 0:
+            self.weighted_loss_start_step = self.weighted_loss_start_epoch * steps_per_epoch
+
         # === Compute eval_batch_size === #
         if self.eval_batch_size is not None:
             assert self.eval_batch_multiplier is None
@@ -187,7 +192,7 @@ class SingleTaskConfigurator(zconf.RunConfig):
                 "max_steps": int(max_steps),
                 "warmup_steps": int(max_steps * self.warmup_steps_proportion),
                 "weighted_sampling_start_step": self.weighted_sampling_start_step,
-                # "weighted_sampling_start_epoch": self.weighted_sampling_start_epoch,
+                "weighted_loss_start_step": self.weighted_loss_start_step,
                 "fix_seed_for_weighted_sampler": self.fix_seed_for_weighted_sampler,
             },
             "task_specific_configs_dict": {
@@ -275,6 +280,8 @@ class SimpleAPIMultiTaskConfigurator(zconf.RunConfig):
     train_loss_weights = zconf.attr(type=str, default=None)
     weighted_sampling_start_step = zconf.attr(type=int, default=0)
     weighted_sampling_start_epoch = zconf.attr(type=int, default=1)
+    weighted_loss_start_step = zconf.attr(type=int, default=0)
+    weighted_loss_start_epoch = zconf.attr(type=int, default=1)
     fix_seed_for_weighted_sampler = zconf.attr(action="store_true")
     epochs = zconf.attr(type=int, default=None)
     max_steps = zconf.attr(type=int, default=None)
@@ -416,6 +423,8 @@ class SimpleAPIMultiTaskConfigurator(zconf.RunConfig):
 
         if self.weighted_sampling_start_step == 0:
             self.weighted_sampling_start_step = self.weighted_sampling_start_epoch * steps_per_epoch
+        if self.weighted_loss_start_step == 0:
+            self.weighted_loss_start_step = self.weighted_loss_start_epoch * steps_per_epoch
 
         # === Compute eval_batch_size === #
         # Eval batch size is often a multiple of train batch size,
@@ -451,7 +460,7 @@ class SimpleAPIMultiTaskConfigurator(zconf.RunConfig):
                 "steps_per_epoch": int(steps_per_epoch),
                 "warmup_steps": int(max_steps * self.warmup_steps_proportion),
                 "weighted_sampling_start_step": self.weighted_sampling_start_step,
-                # "weighted_sampling_start_epoch": self.weighted_sampling_start_epoch,
+                "weighted_loss_start_step": self.weighted_loss_start_step,
                 "fix_seed_for_weighted_sampler": self.fix_seed_for_weighted_sampler,
             },
             "task_specific_configs_dict": {

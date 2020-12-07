@@ -73,6 +73,9 @@ class JiantRunner:
         loss_weights_dict = {}
         for task_name in self.jiant_task_container.task_run_config.train_task_list:
             task_specific_config = self.jiant_task_container.task_specific_configs[task_name]
+            logger.info('task="%s": loading loss weights from "%s"',
+                        task_name,
+                        task_specific_config.train_loss_weights)
             train_batch_size = task_specific_config.train_batch_size
             if task_specific_config.train_loss_weights is not None:
                 dataset = pd.read_csv(task_specific_config.train_loss_weights,
@@ -92,12 +95,11 @@ class JiantRunner:
 
     def run_train_context(self, verbose=True):
         train_dataloader_dict = self.get_train_dataloader_dict()
+        loss_weights_dict = {}
         train_state = TrainState.from_task_name_list(
             self.jiant_task_container.task_run_config.train_task_list
         )
         global_train_config = self.jiant_task_container.global_train_config
-
-        loss_weights_dict = self.get_loss_weights_dict()
 
         losses = []
         for step in maybe_tqdm(
@@ -109,6 +111,8 @@ class JiantRunner:
 
             if step == global_train_config.weighted_sampling_start_step:
                 train_dataloader_dict = self.get_train_dataloader_dict(do_weighted_sampling=True)
+            if step == global_train_config.weighted_loss_start_step:
+                loss_weights_dict = self.get_loss_weights_dict()
 
             loss_per_step = self.run_train_step(
                 train_dataloader_dict=train_dataloader_dict, train_state=train_state,
@@ -124,10 +128,9 @@ class JiantRunner:
 
     def resume_train_context(self, train_state, verbose=True):
         train_dataloader_dict = self.get_train_dataloader_dict()
+        loss_weights_dict = {}
         start_position = train_state.global_steps
         global_train_config = self.jiant_task_container.global_train_config
-
-        loss_weights_dict = self.get_loss_weights_dict(start_position=start_position)
 
         losses = []
         for step in maybe_tqdm(
@@ -139,8 +142,10 @@ class JiantRunner:
         ):
             regular_log(logger, step, interval=10, tag='train')
 
-            if step == self.jiant_task_container.global_train_config.weighted_sampling_start_step:
+            if step == global_train_config.weighted_sampling_start_step:
                 train_dataloader_dict = self.get_train_dataloader_dict(do_weighted_sampling=True)
+            if step >= global_train_config.weighted_loss_start_step:
+                loss_weights_dict = self.get_loss_weights_dict()
 
             loss_per_step = self.run_train_step(
                 train_dataloader_dict=train_dataloader_dict, train_state=train_state,
@@ -166,7 +171,7 @@ class JiantRunner:
         for i in range(task_specific_config.gradient_accumulation_steps):
             batch, batch_metadata = train_dataloader_dict[task_name].pop()
 
-            loss_weights = loss_weights_dict[task_name].pop() if loss_weights_dict[task_name] is not None else None
+            loss_weights = loss_weights_dict[task_name].pop() if loss_weights_dict.get(task_name, None) is not None else None
 
             batch = batch.to(self.device)
             model_output = wrap_jiant_forward(
