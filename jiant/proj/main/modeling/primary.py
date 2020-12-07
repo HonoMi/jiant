@@ -1,4 +1,5 @@
 from typing import Dict, Union
+import torch
 
 import torch.nn as nn
 
@@ -23,7 +24,7 @@ class JiantModel(nn.Module):
         self.task_to_taskmodel_map = task_to_taskmodel_map
         self.tokenizer = tokenizer
 
-    def forward(self, batch: tasks.BatchMixin, task: tasks.Task, compute_loss: bool = False):
+    def forward(self, batch: tasks.BatchMixin, task: tasks.Task, compute_loss: bool = False, loss_weights: torch.Tensor=None):
         """Calls to this forward method are delegated to the forward of the appropriate taskmodel.
 
         When JiantModel forward is called, the task name from the task argument is used as a key
@@ -49,7 +50,7 @@ class JiantModel(nn.Module):
         taskmodel_key = self.task_to_taskmodel_map[task_name]
         taskmodel = self.taskmodels_dict[taskmodel_key]
         return taskmodel(
-            batch=batch, task=task, tokenizer=self.tokenizer, compute_loss=compute_loss,
+            batch=batch, task=task, tokenizer=self.tokenizer, compute_loss=compute_loss, loss_weights=loss_weights
         ).to_dict()
 
 
@@ -58,6 +59,7 @@ def wrap_jiant_forward(
     batch: tasks.BatchMixin,
     task: tasks.Task,
     compute_loss: bool = False,
+    loss_weights: torch.Tensor = None,
 ):
     """Wrapper to repackage model inputs using dictionaries for compatibility with DataParallel.
 
@@ -80,6 +82,7 @@ def wrap_jiant_forward(
     model_output = construct_output_from_dict(
         jiant_model(
             batch=batch.to_dict() if is_multi_gpu else batch, task=task, compute_loss=compute_loss,
+            loss_weights=loss_weights,
         )
     )
     if is_multi_gpu:

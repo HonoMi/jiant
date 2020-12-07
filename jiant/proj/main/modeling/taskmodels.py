@@ -26,14 +26,21 @@ class ClassificationModel(Taskmodel):
         super().__init__(encoder=encoder)
         self.classification_head = classification_head
 
-    def forward(self, batch, task, tokenizer, compute_loss: bool = False):
+    def forward(self, batch, task, tokenizer, compute_loss: bool = False, loss_weights: torch.Tensor = None):
         encoder_output = get_output_from_encoder_and_batch(encoder=self.encoder, batch=batch)
         logits = self.classification_head(pooled=encoder_output.pooled)
         if compute_loss:
-            loss_fct = nn.CrossEntropyLoss()
-            loss = loss_fct(
-                logits.view(-1, self.classification_head.num_labels), batch.label_id.view(-1),
-            )
+            if loss_weights is not None:
+                loss_fct = nn.CrossEntropyLoss(reduction='none')
+                loss = loss_fct(
+                    logits.view(-1, self.classification_head.num_labels), batch.label_id.view(-1),
+                )
+                loss = (loss * loss_weights).mean()
+            else:
+                loss_fct = nn.CrossEntropyLoss()
+                loss = loss_fct(
+                    logits.view(-1, self.classification_head.num_labels), batch.label_id.view(-1),
+                )
             return LogitsAndLossOutput(logits=logits, loss=loss, other=encoder_output.other)
         else:
             return LogitsOutput(logits=logits, other=encoder_output.other)
@@ -44,13 +51,18 @@ class RegressionModel(Taskmodel):
         super().__init__(encoder=encoder)
         self.regression_head = regression_head
 
-    def forward(self, batch, task, tokenizer, compute_loss: bool = False):
+    def forward(self, batch, task, tokenizer, compute_loss: bool = False, loss_weights: torch.Tensor = None):
         encoder_output = get_output_from_encoder_and_batch(encoder=self.encoder, batch=batch)
         # TODO: Abuse of notation - these aren't really logits  (issue #1187)
         logits = self.regression_head(pooled=encoder_output.pooled)
         if compute_loss:
-            loss_fct = nn.MSELoss()
-            loss = loss_fct(logits.view(-1), batch.label.view(-1))
+            if loss_weights is not None:
+                loss_fct = nn.MSELoss(reduction='none')
+                loss = loss_fct(logits.view(-1), batch.label.view(-1))
+                loss = (loss * loss_weights).mean()
+            else:
+                loss_fct = nn.MSELoss()
+                loss = loss_fct(logits.view(-1), batch.label.view(-1))
             return LogitsAndLossOutput(logits=logits, loss=loss, other=encoder_output.other)
         else:
             return LogitsOutput(logits=logits, other=encoder_output.other)
@@ -62,7 +74,7 @@ class MultipleChoiceModel(Taskmodel):
         self.num_choices = num_choices
         self.choice_scoring_head = choice_scoring_head
 
-    def forward(self, batch, task, tokenizer, compute_loss: bool = False):
+    def forward(self, batch, task, tokenizer, compute_loss: bool = False, loss_weights: torch.Tensor = None):
         input_ids = batch.input_ids
         segment_ids = batch.segment_ids
         input_mask = batch.input_mask
@@ -96,8 +108,13 @@ class MultipleChoiceModel(Taskmodel):
         )
 
         if compute_loss:
-            loss_fct = nn.CrossEntropyLoss()
-            loss = loss_fct(logits.view(-1, self.num_choices), batch.label_id.view(-1))
+            if loss_weights is not None:
+                loss_fct = nn.CrossEntropyLoss(reduction='none')
+                loss = loss_fct(logits.view(-1, self.num_choices), batch.label_id.view(-1))
+                loss = (loss * loss_weights).mean()
+            else:
+                loss_fct = nn.CrossEntropyLoss()
+                loss = loss_fct(logits.view(-1, self.num_choices), batch.label_id.view(-1))
             return LogitsAndLossOutput(logits=logits, loss=loss, other=reshaped_outputs)
         else:
             return LogitsOutput(logits=logits, other=reshaped_outputs)
@@ -108,7 +125,9 @@ class SpanComparisonModel(Taskmodel):
         super().__init__(encoder=encoder)
         self.span_comparison_head = span_comparison_head
 
-    def forward(self, batch, task, tokenizer, compute_loss: bool = False):
+    def forward(self, batch, task, tokenizer, compute_loss: bool = False, loss_weights: torch.Tensor = None):
+        if loss_weights is not None:
+            raise NotImplementedError()
         encoder_output = get_output_from_encoder_and_batch(encoder=self.encoder, batch=batch)
         logits = self.span_comparison_head(unpooled=encoder_output.unpooled, spans=batch.spans)
         if compute_loss:
@@ -130,7 +149,9 @@ class SpanPredictionModel(Taskmodel):
         # we can guarantee the output distribution will only be non-zero at those dimensions.
         self.span_prediction_head = span_prediction_head
 
-    def forward(self, batch, task, tokenizer, compute_loss: bool = False):
+    def forward(self, batch, task, tokenizer, compute_loss: bool = False, loss_weights: torch.Tensor = None):
+        if loss_weights is not None:
+            raise NotImplementedError()
         encoder_output = get_output_from_encoder_and_batch(encoder=self.encoder, batch=batch)
         logits = self.span_prediction_head(unpooled=encoder_output.unpooled)
         # Ensure logits in valid range is at least self.offset_margin higher than others
@@ -151,7 +172,9 @@ class MultiLabelSpanComparisonModel(Taskmodel):
         super().__init__(encoder=encoder)
         self.span_comparison_head = span_comparison_head
 
-    def forward(self, batch, task, tokenizer, compute_loss: bool = False):
+    def forward(self, batch, task, tokenizer, compute_loss: bool = False, loss_weights: torch.Tensor = None):
+        if loss_weights is not None:
+            raise NotImplementedError()
         encoder_output = get_output_from_encoder_and_batch(encoder=self.encoder, batch=batch)
         logits = self.span_comparison_head(unpooled=encoder_output.unpooled, spans=batch.spans)
         if compute_loss:
@@ -171,7 +194,9 @@ class TokenClassificationModel(Taskmodel):
         super().__init__(encoder=encoder)
         self.token_classification_head = token_classification_head
 
-    def forward(self, batch, task, tokenizer, compute_loss: bool = False):
+    def forward(self, batch, task, tokenizer, compute_loss: bool = False, loss_weights: torch.Tensor = None):
+        if loss_weights is not None:
+            raise NotImplementedError()
         encoder_output = get_output_from_encoder_and_batch(encoder=self.encoder, batch=batch)
         logits = self.token_classification_head(unpooled=encoder_output.unpooled)
         if compute_loss:
@@ -190,7 +215,7 @@ class QAModel(Taskmodel):
         super().__init__(encoder=encoder)
         self.qa_head = qa_head
 
-    def forward(self, batch, task, tokenizer, compute_loss: bool = False):
+    def forward(self, batch, task, tokenizer, compute_loss: bool = False, loss_weights: torch.Tensor = None):
         encoder_output = get_output_from_encoder_and_batch(encoder=self.encoder, batch=batch)
         logits = self.qa_head(unpooled=encoder_output.unpooled)
         if compute_loss:
@@ -198,6 +223,7 @@ class QAModel(Taskmodel):
                 logits=logits,
                 start_positions=batch.start_position,
                 end_positions=batch.end_position,
+                loss_weights=loss_weights,
             )
             return LogitsAndLossOutput(logits=logits, loss=loss, other=encoder_output.other)
         else:
@@ -209,7 +235,9 @@ class MLMModel(Taskmodel):
         super().__init__(encoder=encoder)
         self.mlm_head = mlm_head
 
-    def forward(self, batch, task, tokenizer, compute_loss: bool = False):
+    def forward(self, batch, task, tokenizer, compute_loss: bool = False, loss_weights: torch.Tensor = None):
+        if loss_weights is not None:
+            raise NotImplementedError()
         masked_batch = batch.get_masked(
             mlm_probability=task.mlm_probability, tokenizer=tokenizer, do_mask=task.do_mask,
         )
@@ -233,7 +261,9 @@ class EmbeddingModel(Taskmodel):
         self.pooler_head = pooler_head
         self.layer = layer
 
-    def forward(self, batch, task, tokenizer, compute_loss: bool = False):
+    def forward(self, batch, task, tokenizer, compute_loss: bool = False, loss_weights: torch.Tensor = None):
+        if loss_weights is not None:
+            raise NotImplementedError()
         with transformer_utils.output_hidden_states_context(self.encoder):
             encoder_output = get_output_from_encoder_and_batch(encoder=self.encoder, batch=batch)
         # A tuple of layers of hidden states
@@ -373,7 +403,7 @@ def compute_mlm_loss(logits, masked_lm_labels):
     return loss_fct(logits.view(-1, vocab_size), masked_lm_labels.view(-1))
 
 
-def compute_qa_loss(logits, start_positions, end_positions):
+def compute_qa_loss(logits, start_positions, end_positions, loss_weights: torch.Tensor = None):
     # Do we want to keep them as 1 tensor, or multiple?
     # bs x 2 x seq_len x 1
 
@@ -389,8 +419,15 @@ def compute_qa_loss(logits, start_positions, end_positions):
     start_positions.clamp_(0, ignored_index)
     end_positions.clamp_(0, ignored_index)
 
-    loss_fct = nn.CrossEntropyLoss(ignore_index=ignored_index)
-    start_loss = loss_fct(start_logits, start_positions)
-    end_loss = loss_fct(end_logits, end_positions)
+    if loss_weights is not None:
+        loss_fct = nn.CrossEntropyLoss(reduction='none')
+        start_loss = loss_fct(start_logits, start_positions)
+        start_loss = (start_loss * loss_weights).mean()
+        end_loss = loss_fct(end_logits, end_positions)
+        end_loss = (end_loss * loss_weights).mean()
+    else:
+        loss_fct = nn.CrossEntropyLoss(ignore_index=ignored_index)
+        start_loss = loss_fct(start_logits, start_positions)
+        end_loss = loss_fct(end_logits, end_positions)
     total_loss = (start_loss + end_loss) / 2
     return total_loss

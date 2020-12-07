@@ -94,6 +94,7 @@ class SingleTaskConfigurator(zconf.RunConfig):
     gradient_accumulation_steps = zconf.attr(type=int, default=1)
     eval_subset_num = zconf.attr(type=int, default=500)
     train_sample_weights = zconf.attr(type=str, default=None)
+    train_loss_weights = zconf.attr(type=str, default=None)
     weighted_sampling_start_step = zconf.attr(type=int, default=0)  # zero start
     weighted_sampling_start_epoch = zconf.attr(type=int, default=0)  # zero start
     fix_seed_for_weighted_sampler = zconf.attr(action="store_true")
@@ -196,6 +197,7 @@ class SingleTaskConfigurator(zconf.RunConfig):
                     "gradient_accumulation_steps": self.gradient_accumulation_steps,
                     "eval_subset_num": self.eval_subset_num,
                     "train_sample_weights": self.train_sample_weights,
+                    "train_loss_weights": self.train_loss_weights,
                 }
             },
             "taskmodels_config": {
@@ -270,6 +272,7 @@ class SimpleAPIMultiTaskConfigurator(zconf.RunConfig):
     gradient_accumulation_steps = zconf.attr(type=int, default=1)
     eval_subset_num = zconf.attr(type=int, default=500)
     train_sample_weights = zconf.attr(type=str, default=None)
+    train_loss_weights = zconf.attr(type=str, default=None)
     weighted_sampling_start_step = zconf.attr(type=int, default=0)
     weighted_sampling_start_epoch = zconf.attr(type=int, default=1)
     fix_seed_for_weighted_sampler = zconf.attr(action="store_true")
@@ -458,6 +461,7 @@ class SimpleAPIMultiTaskConfigurator(zconf.RunConfig):
                     "gradient_accumulation_steps": self.gradient_accumulation_steps,
                     "eval_subset_num": self.eval_subset_num,
                     "train_sample_weights": self.train_sample_weights,
+                    "train_loss_weights": self.train_loss_weights,
                 }
                 for task_name in full_task_name_list
             },
