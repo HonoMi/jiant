@@ -151,6 +151,8 @@ class JiantRunner:
                 "loss_val": loss_per_step,
             },
         )
+        for i_group, param_group in enumerate(self.optimizer_scheduler.optimizer.param_groups):
+            self.tf_writer.add_scalar(f'params-{i_group}/lrate', param_group['lr'], global_step=train_state.global_steps)
         self.tf_writer.add_scalar(f'{task_name}/train-loss', loss_per_step, global_step=train_state.global_steps)
 
     def run_train_eval(self,
