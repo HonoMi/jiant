@@ -51,7 +51,7 @@
 
 ## 新規モデルタイプの追加
 - `grep "Bert" ./jiant` で出てくる全てのファイルに，新規クラス(ex. GPT2)を追加する必要がある．
-- ただ，上記殆どのファイルは，一部のタスクからしか呼ばれない．それ意外のタスクのみでよいなら，以下のファイルを編集すれば良いと思われる：
+- ただ，上記殆どのファイルは，一部のタスクからしか呼ばれない．それ以外のタスクのみでよいなら，以下のファイルを編集すれば良いと思われる：
     * jiant/jiant/proj/main/export_model.py
     * jiant/jiant/shared/model_resolution.py
     * jiant/jiant/proj/main/modeling/heads.py
