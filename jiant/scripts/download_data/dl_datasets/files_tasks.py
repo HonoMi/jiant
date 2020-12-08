@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 import pandas as pd
 import re
@@ -32,6 +33,10 @@ def download_task_data_and_write_config(task_name: str, task_data_path: str, tas
         download_abductive_nli_data_and_write_config(
             task_name=task_name, task_data_path=task_data_path, task_config_path=task_config_path
         )
+    elif task_name == "fever_nli":
+        download_fever_nli_data_and_write_config(
+            task_name=task_name, task_data_path=task_data_path, task_config_path=task_config_path
+        )
     elif task_name == "swag":
         download_swag_data_and_write_config(
             task_name=task_name, task_data_path=task_data_path, task_config_path=task_config_path
@@ -50,6 +55,14 @@ def download_task_data_and_write_config(task_name: str, task_data_path: str, tas
         )
     elif task_name == "mrqa_natural_questions":
         download_mrqa_natural_questions_data_and_write_config(
+            task_name=task_name, task_data_path=task_data_path, task_config_path=task_config_path
+        )
+    elif task_name == "piqa":
+        download_piqa_data_and_write_config(
+            task_name=task_name, task_data_path=task_data_path, task_config_path=task_config_path
+        )
+    elif task_name == "winogrande":
+        download_winogrande_data_and_write_config(
             task_name=task_name, task_data_path=task_data_path, task_config_path=task_config_path
         )
     else:
@@ -84,7 +97,7 @@ def download_squad_data_and_write_config(
         data={
             "task": "squad",
             "paths": {"train": train_path, "val": val_path},
-            "version_2_with_negative": version_2_with_negative,
+            "kwargs": {"version_2_with_negative": version_2_with_negative},
             "name": task_name,
         },
         path=task_config_path,
@@ -156,6 +169,66 @@ def download_abductive_nli_data_and_write_config(
         },
         path=task_config_path,
         skip_if_exists=True,
+    )
+
+
+def download_fever_nli_data_and_write_config(
+    task_name: str, task_data_path: str, task_config_path: str
+):
+    os.makedirs(task_data_path, exist_ok=True)
+    download_utils.download_and_unzip(
+        ("https://www.dropbox.com/s/hylbuaovqwo2zav/nli_fever.zip?dl=1"), task_data_path,
+    )
+    # Since the FEVER NLI dataset doesn't have labels for the dev set, we also download the original
+    # FEVER dev set and match example CIDs to obtain labels.
+    orig_dev_path = os.path.join(task_data_path, "fever-dev-temp.jsonl")
+    download_utils.download_file(
+        "https://s3-eu-west-1.amazonaws.com/fever.public/shared_task_dev.jsonl", orig_dev_path,
+    )
+    id_to_label = {}
+    for line in py_io.read_jsonl(orig_dev_path):
+        if "id" not in line:
+            logging.warning("FEVER dev dataset is missing ID.")
+            continue
+        if "label" not in line:
+            logging.warning("FEVER dev dataset is missing label.")
+            continue
+        id_to_label[line["id"]] = line["label"]
+    os.remove(orig_dev_path)
+
+    dev_path = os.path.join(task_data_path, "nli_fever", "dev_fitems.jsonl")
+    dev_examples = []
+    for line in py_io.read_jsonl(dev_path):
+        if "cid" not in line:
+            logging.warning("Data in {} is missing CID.".format(dev_path))
+            continue
+        if int(line["cid"]) not in id_to_label:
+            logging.warning("Could not match CID {} to dev data.".format(line["cid"]))
+            continue
+        dev_example = line
+        dev_example["label"] = id_to_label[int(line["cid"])]
+        dev_examples.append(dev_example)
+    py_io.write_jsonl(dev_examples, os.path.join(task_data_path, "val.jsonl"))
+    os.remove(dev_path)
+
+    for phase in ["train", "test"]:
+        os.rename(
+            os.path.join(task_data_path, "nli_fever", f"{phase}_fitems.jsonl"),
+            os.path.join(task_data_path, f"{phase}.jsonl"),
+        )
+    shutil.rmtree(os.path.join(task_data_path, "nli_fever"))
+
+    py_io.write_json(
+        data={
+            "task": task_name,
+            "paths": {
+                "train": os.path.join(task_data_path, "train.jsonl"),
+                "val": os.path.join(task_data_path, "val.jsonl"),
+                "test": os.path.join(task_data_path, "test.jsonl"),
+            },
+            "name": task_name,
+        },
+        path=task_config_path,
     )
 
 
@@ -608,4 +681,80 @@ def download_mrqa_natural_questions_data_and_write_config(
         },
         path=task_config_path,
         skip_if_exists=True,
+    )
+
+
+def download_piqa_data_and_write_config(task_name: str, task_data_path: str, task_config_path: str):
+    os.makedirs(task_data_path, exist_ok=True)
+    download_utils.download_file(
+        "https://yonatanbisk.com/piqa/data/train.jsonl",
+        os.path.join(task_data_path, "train.jsonl"),
+    )
+    download_utils.download_file(
+        "https://yonatanbisk.com/piqa/data/train-labels.lst",
+        os.path.join(task_data_path, "train-labels.lst"),
+    )
+    download_utils.download_file(
+        "https://yonatanbisk.com/piqa/data/valid.jsonl",
+        os.path.join(task_data_path, "valid.jsonl"),
+    )
+    download_utils.download_file(
+        "https://yonatanbisk.com/piqa/data/valid-labels.lst",
+        os.path.join(task_data_path, "valid-labels.lst"),
+    )
+    download_utils.download_file(
+        "https://yonatanbisk.com/piqa/data/tests.jsonl",
+        os.path.join(task_data_path, "tests.jsonl"),
+    )
+
+    py_io.write_json(
+        data={
+            "task": task_name,
+            "paths": {
+                "train": os.path.join(task_data_path, "train.jsonl"),
+                "train_labels": os.path.join(task_data_path, "train-labels.lst"),
+                "val": os.path.join(task_data_path, "valid.jsonl"),
+                "val_labels": os.path.join(task_data_path, "valid-labels.lst"),
+                "test": os.path.join(task_data_path, "tests.jsonl"),
+            },
+            "name": task_name,
+        },
+        path=task_config_path,
+    )
+
+
+def download_winogrande_data_and_write_config(
+    task_name: str, task_data_path: str, task_config_path: str
+):
+    os.makedirs(task_data_path, exist_ok=True)
+    download_utils.download_and_unzip(
+        "https://storage.googleapis.com/ai2-mosaic/public/winogrande/winogrande_1.1.zip",
+        task_data_path,
+    )
+
+    task_data_path = os.path.join(task_data_path, "winogrande_1.1")
+
+    py_io.write_json(
+        data={
+            "task": task_name,
+            "paths": {
+                "train": os.path.join(task_data_path, "train_xl.jsonl"),
+                "train_labels": os.path.join(task_data_path, "train_xl-labels.lst"),
+                "train_xs": os.path.join(task_data_path, "train_xs.jsonl"),
+                "train_xs_labels": os.path.join(task_data_path, "train_xs-labels.lst"),
+                "train_s": os.path.join(task_data_path, "train_s.jsonl"),
+                "train_s_labels": os.path.join(task_data_path, "train_s-labels.lst"),
+                "train_m": os.path.join(task_data_path, "train_m.jsonl"),
+                "train_m_labels": os.path.join(task_data_path, "train_m-labels.lst"),
+                "train_l": os.path.join(task_data_path, "train_l.jsonl"),
+                "train_l_labels": os.path.join(task_data_path, "train_l-labels.lst"),
+                "train_xl": os.path.join(task_data_path, "train_xl.jsonl"),
+                "train_xl_labels": os.path.join(task_data_path, "train_xl-labels.lst"),
+                "val": os.path.join(task_data_path, "dev.jsonl"),
+                "val_labels": os.path.join(task_data_path, "dev-labels.lst"),
+                "test": os.path.join(task_data_path, "test.jsonl"),
+            },
+            "name": task_name,
+        },
+        path=task_config_path,
     )

@@ -43,13 +43,15 @@ class RunConfiguration(zconf.RunConfig):
 
     # === Running Setup === #
     do_save = zconf.attr(action="store_true")
+    do_save_last = zconf.attr(action="store_true")
+    do_save_best = zconf.attr(action="store_true")
     write_val_preds = zconf.attr(action="store_true")
     write_test_preds = zconf.attr(action="store_true")
     eval_every_steps = zconf.attr(type=int, default=0)
     save_every_steps = zconf.attr(type=int, default=0)
     save_checkpoint_every_steps = zconf.attr(type=int, default=0)
     no_improvements_for_n_evals = zconf.attr(type=int, default=0)
-    delete_checkpoint_if_done = zconf.attr(action="store_true")
+    keep_checkpoint_when_done = zconf.attr(action="store_true")
     force_overwrite = zconf.attr(action="store_true")
     seed = zconf.attr(type=int, default=-1)
 
@@ -224,13 +226,15 @@ def run_simple(args: RunConfiguration, with_continue: bool = False):
             do_train=bool(args.train_tasks),
             do_val=bool(args.val_tasks),
             do_save=args.do_save,
+            do_save_best=args.do_save_best,
+            do_save_last=args.do_save_last,
             write_val_preds=args.write_val_preds,
             write_test_preds=args.write_test_preds,
             eval_every_steps=args.eval_every_steps,
             save_every_steps=args.save_every_steps,
             save_checkpoint_every_steps=args.save_checkpoint_every_steps,
             no_improvements_for_n_evals=args.no_improvements_for_n_evals,
-            delete_checkpoint_if_done=args.delete_checkpoint_if_done,
+            keep_checkpoint_when_done=args.keep_checkpoint_when_done,
             force_overwrite=args.force_overwrite,
             seed=args.seed,
             # === Training Learning Parameters === #

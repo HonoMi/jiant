@@ -264,6 +264,48 @@ class SimpleAccuracyEvaluationScheme(BaseLogitsEvaluationScheme):
         return Metrics(major=acc, minor={"acc": acc})
 
 
+class MCTACOEvaluationScheme(BaseLogitsEvaluationScheme):
+    @classmethod
+    def get_preds_from_accumulator(self, task, accumulator):
+        logits = accumulator.get_accumulated()
+        pred = np.argmax(logits, axis=1)
+        guid = accumulator.get_guids()
+        return guid, pred
+
+    @classmethod
+    def compute_metrics_from_accumulator(self, task, accumulator, tokenizer, labels) -> Metrics:
+        guid, pred = self.get_preds_from_accumulator(task=task, accumulator=accumulator)
+        em_ls = []
+        f1_ls = []
+        label_pred_by_question = {}
+
+        for one_guid, one_pred, one_label in zip(guid, pred, labels):
+            split, question_id, example_id = one_guid.split("-")
+            if question_id not in label_pred_by_question:
+                label_pred_by_question[question_id] = [], []
+            label_pred_by_question[question_id][0].append(one_label)
+            label_pred_by_question[question_id][1].append(one_pred)
+
+        em_ls = [
+            float(group_label == group_pred)
+            for group_label, group_pred in label_pred_by_question.values()
+        ]
+        f1_ls = [
+            f1_score(y_true=group_label, y_pred=group_pred)
+            for group_label, group_pred in label_pred_by_question.values()
+        ]
+
+        em = sum(em_ls) / len(em_ls)
+        f1 = sum(f1_ls) / len(f1_ls)
+        minor = {
+            "em": em,
+            "f1": f1,
+            "f1_em": (f1 + em) / 2,
+        }
+        metrics = Metrics(major=minor["f1_em"], minor=minor,)
+        return metrics
+
+
 class MultiLabelAccAndF1EvaluationScheme(BaseLogitsEvaluationScheme):
     def get_labels_from_cache_and_examples(self, task, cache, examples):
         return get_multi_label_ids_from_cache(cache=cache)
@@ -501,7 +543,7 @@ class ReCordEvaluationScheme(BaseEvaluationScheme):
         predictions_dict = {}
 
         preds = cls.get_preds_from_accumulator(task, accumulator)
-        guid_list = guid_list = accumulator.get_guids()
+        guid_list = accumulator.get_guids()
         gold_label_list_of_sets = accumulator.get_gold_label_list()
 
         question_ids = []
@@ -920,6 +962,7 @@ def get_evaluation_scheme_for_task(task) -> BaseEvaluationScheme:
             tasks.AcceptabilityDefinitenessTask,
             tasks.BoolQTask,
             tasks.CopaTask,
+            tasks.FeverNliTask,
             tasks.MnliTask,
             tasks.PawsXTask,
             tasks.QnliTask,
@@ -934,9 +977,12 @@ def get_evaluation_scheme_for_task(task) -> BaseEvaluationScheme:
             tasks.XnliTask,
             tasks.MCScriptTask,
             tasks.ArctTask,
+            tasks.PiqaTask,
         ),
     ):
         return SimpleAccuracyEvaluationScheme()
+    elif isinstance(task, tasks.MCTACOTask):
+        return MCTACOEvaluationScheme()
     elif isinstance(task, tasks.CCGTask):
         return CCGEvaluationScheme()
     elif isinstance(task, tasks.CommitmentBankTask):
@@ -954,7 +1000,10 @@ def get_evaluation_scheme_for_task(task) -> BaseEvaluationScheme:
             tasks.HellaSwagTask,
             tasks.MutualTask,
             tasks.MutualPlusTask,
+            tasks.QuailTask,
             tasks.SocialIQATask,
+            tasks.WinograndeTask,
+            tasks.MCTestTask,
         ),
     ):
         return MultipleChoiceAccuracyEvaluationScheme()

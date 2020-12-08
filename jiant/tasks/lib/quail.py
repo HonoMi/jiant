@@ -3,14 +3,13 @@ from dataclasses import dataclass
 from jiant.tasks.lib.templates.shared import labels_to_bimap
 from jiant.tasks.lib.templates import multiple_choice as mc_template
 from jiant.utils.python.io import read_json_lines
-from jiant.tasks.core import default_get_test_labels
 
 
 @dataclass
 class Example(mc_template.Example):
     @property
     def task(self):
-        return ArcEasyTask
+        return QuailTask
 
 
 @dataclass
@@ -28,13 +27,13 @@ class Batch(mc_template.Batch):
     pass
 
 
-class ArcEasyTask(mc_template.AbstractMultipleChoiceTask):
+class QuailTask(mc_template.AbstractMultipleChoiceTask):
     Example = Example
     TokenizedExample = Example
     DataRow = DataRow
     Batch = Batch
 
-    CHOICE_KEYS = ["A", "B", "C", "D", "E"]
+    CHOICE_KEYS = ["0", "1", "2", "3"]
     CHOICE_TO_ID, ID_TO_CHOICE = labels_to_bimap(CHOICE_KEYS)
     NUM_CHOICES = len(CHOICE_KEYS)
 
@@ -49,30 +48,14 @@ class ArcEasyTask(mc_template.AbstractMultipleChoiceTask):
 
     @classmethod
     def _create_examples(cls, lines, set_type):
-        potential_label_map = {
-            "1": "A",
-            "2": "B",
-            "3": "C",
-            "4": "D",
-            "5": "E",
-        }
-        NUM_CHOICES = len(potential_label_map)
         examples = []
         for i, line in enumerate(lines):
-            label = line["answerKey"]
-            if label in potential_label_map:
-                label = potential_label_map[label]
-            choice_list = [d for d in line["choices"]["text"]]
-            filler_choice_list = ["." for i in range(NUM_CHOICES - len(choice_list))]
-            choice_list = choice_list + filler_choice_list
-            assert len(choice_list) == NUM_CHOICES
-
             examples.append(
                 Example(
                     guid="%s-%s" % (set_type, i),
-                    prompt=line["question"],
-                    choice_list=choice_list,
-                    label=label,
+                    prompt=line["context"],
+                    choice_list=[d for d in line["answers"]],
+                    label=line["label"],
                 )
             )
         return examples

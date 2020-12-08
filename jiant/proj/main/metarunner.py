@@ -71,6 +71,7 @@ class JiantMetarunner(AbstractMetarunner):
         verbose: bool = True,
         save_best_model: bool = True,
         load_best_model: bool = True,
+        save_last_model: bool = True,
         log_writer: BaseZLogger = PRINT_LOGGER,
         tf_writer: SummaryWriter = None,
     ):
@@ -84,6 +85,7 @@ class JiantMetarunner(AbstractMetarunner):
         self.verbose = verbose
         self.save_best_model = save_best_model
         self.load_best_model = load_best_model
+        self.save_last_model = save_last_model
         self.log_writer = log_writer
         self.tf_writer = tf_writer
 
@@ -124,10 +126,28 @@ class JiantMetarunner(AbstractMetarunner):
 
     def save_model(self):
         save_model_with_metadata(
-            model=self.model,
-            metadata={},
+            model_or_state_dict=self.model,
             output_dir=self.output_dir,
             file_name=f"model__{self.train_state.global_steps:09d}",
+        )
+
+    def save_last_model_with_metadata(self):
+        save_model_with_metadata(
+            model_or_state_dict=self.model,
+            output_dir=self.output_dir,
+            file_name="last_model",
+            metadata={"train_state": self.train_state.to_dict()},
+        )
+
+    def save_best_model_with_metadata(self, val_metrics_dict):
+        save_model_with_metadata(
+            model_or_state_dict=self.best_state_dict,
+            output_dir=self.output_dir,
+            file_name="best_model",
+            metadata={
+                "val_state": self.best_val_state.to_dict(),
+                "val_metrics": self.best_val_state.metrics,
+            },
         )
 
     def should_save_checkpoint(self) -> bool:
@@ -169,6 +189,8 @@ class JiantMetarunner(AbstractMetarunner):
         return False
 
     def done_training(self):
+        if self.save_last_model:
+            self.save_last_model_with_metadata()
         self.eval_save()
         if self.load_best_model and self.best_state_dict is not None:
             if self.verbose:
@@ -231,20 +253,12 @@ class JiantMetarunner(AbstractMetarunner):
         if self.best_val_state is None or val_state.score > self.best_val_state.score:
             self.best_val_state = val_state.new()
             self.log_writer.write_entry("train_val_best", self.best_val_state.to_dict())
-            if self.save_best_model:
-                save_model_with_metadata(
-                    model=self.model,
-                    metadata={
-                        "val_state": self.best_val_state.to_dict(),
-                        "val_metrics": val_metrics_dict,
-                    },
-                    output_dir=self.output_dir,
-                    file_name="best_model",
-                )
             del self.best_state_dict
             self.best_state_dict = copy_state_dict(
                 state_dict=get_model_for_saving(self.model).state_dict(), target_device=CPU_DEVICE,
             )
+            if self.save_best_model:
+                self.save_best_model_with_metadata(val_metrics_dict=val_metrics_dict)
             self.num_evals_since_improvement = 0
         self.log_writer.write_entry(
             "early_stopping",

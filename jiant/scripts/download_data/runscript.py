@@ -10,11 +10,14 @@ import jiant.scripts.download_data.dl_datasets.files_tasks as files_tasks_downlo
 from jiant.tasks.constants import (
     GLUE_TASKS,
     SUPERGLUE_TASKS,
-    OTHER_HF_DATASETS_TASKS,
     XTREME_TASKS,
     BENCHMARKS,
 )
-from jiant.scripts.download_data.constants import SQUAD_TASKS, DIRECT_DOWNLOAD_TASKS
+from jiant.scripts.download_data.constants import (
+    SQUAD_TASKS,
+    DIRECT_DOWNLOAD_TASKS,
+    OTHER_HF_DATASETS_TASKS,
+)
 from jiant.scripts.download_data.cross_validation import parse_cv_task_name
 
 # DIRECT_DOWNLOAD_TASKS need to be directly downloaded because the HF Datasets
