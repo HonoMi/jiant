@@ -38,6 +38,7 @@ class RunConfiguration(zconf.RunConfig):
     write_train_preds = zconf.attr(action="store_true")
     do_save_last = zconf.attr(action="store_true")
     do_save_best = zconf.attr(action="store_true")
+    load_last_model = zconf.attr(action="store_true")
     write_val_preds = zconf.attr(action="store_true")
     write_test_preds = zconf.attr(action="store_true")
     eval_every_steps = zconf.attr(type=int, default=0)
@@ -188,7 +189,7 @@ def run_loop(args: RunConfiguration, checkpoint=None):
                 verbose=True,
                 save_best_model=args.do_save or args.do_save_best,
                 save_last_model=args.do_save or args.do_save_last,
-                load_best_model=True,
+                load_best_model=not args.load_last_model,
                 log_writer=quick_init_out.log_writer,
                 tf_writer=quick_init_out.tf_writer,
             )
@@ -197,11 +198,11 @@ def run_loop(args: RunConfiguration, checkpoint=None):
                 del checkpoint["metarunner_state"]
             metarunner.run_train_loop()
 
-        if args.do_save:
-            torch.save(
-                torch_utils.get_model_for_saving(runner.jiant_model).state_dict(),
-                os.path.join(args.output_dir, "model.p"),
-            )
+        # if args.do_save:
+        #     torch.save(
+        #         torch_utils.get_model_for_saving(runner.jiant_model).state_dict(),
+        #         os.path.join(args.output_dir, "model.p"),
+        #     )
 
         if args.do_train_eval:
             train_eval_results_dict = runner.run_train_eval(

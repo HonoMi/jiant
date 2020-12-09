@@ -194,7 +194,7 @@ class JiantMetarunner(AbstractMetarunner):
         self.eval_save()
         if self.load_best_model and self.best_state_dict is not None:
             if self.verbose:
-                logger.info("Loading Best")
+                logger.info("Loading Best Model")
             copied_state_dict = copy_state_dict(
                 state_dict=self.best_state_dict,
                 target_device=None,  # Why was this required?
@@ -204,6 +204,9 @@ class JiantMetarunner(AbstractMetarunner):
                 self.model.module.load_state_dict(copied_state_dict)
             else:
                 self.model.load_state_dict(copied_state_dict)
+        else:
+            if self.verbose:
+                logger.info("Loading Last Model")
 
     def returned_result(self):
         return {
