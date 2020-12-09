@@ -102,12 +102,30 @@ def setup_runner(
         )
         jiant_model.to(quick_init_out.device)
 
+    # jiant_task_container.global_train_config.weighted_loss_start_step
+    # jiant_task_container.global_train_config.weighted_sampling_start_step
+    # "global_train_config": {
+    #     "max_steps": int(max_steps),
+    #     "warmup_steps": int(max_steps * self.warmup_steps_proportion),
+    #     "weighted_sampling_start_step": self.weighted_sampling_start_step,
+    #     "weighted_loss_start_step": self.weighted_loss_start_step,
+    #     "no_rewarmup_in_second_stage": self.no_rewarmup_in_second_stage,
+    #     "fix_seed_for_weighted_sampler": self.fix_seed_for_weighted_sampler,
+    # },
+
+    global_train_config = jiant_task_container.global_train_config
     optimizer_scheduler = model_setup.create_optimizer(
         model=jiant_model,
         learning_rate=args.learning_rate,
-        t_total=jiant_task_container.global_train_config.max_steps,
-        warmup_steps=jiant_task_container.global_train_config.warmup_steps,
+
+        t_total=global_train_config.first_stage_steps,
+        warmup_steps=global_train_config.warmup_steps,
         warmup_proportion=None,
+
+        t2_total=global_train_config.second_stage_steps,
+        rewarmup_steps=global_train_config.rewarmup_steps,
+        rewarmup_proportion=None,
+
         optimizer_type=args.optimizer_type,
         verbose=verbose,
     )

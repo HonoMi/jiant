@@ -50,14 +50,15 @@
         - jiant test : **jiant val**
 
 ## 新規モデルタイプの追加
-- `grep "Bert" ./jiant` で出てくる全てのファイルに，新規クラス(ex. GPT2)を追加する必要がある．
-- ただ，上記殆どのファイルは，一部のタスクからしか呼ばれない．それ以外のタスクのみでよいなら，以下のファイルを編集すれば良いと思われる：
-    * jiant/jiant/proj/main/export_model.py
-    * jiant/jiant/shared/model_resolution.py
-    * jiant/jiant/proj/main/modeling/heads.py
-    * jiant/jiant/proj/main/modeling/model_setup.py
-* 利用可能なモデル
-    - `jiant/jiant/proj/main/export_model.py`
+1. `grep "Bert|BERT" ./jiant` で出てくるモジュールが，transformer のタイプ依存の処理を行っていると予測できる．
+2. 一方で，上記モジュールの一部は，特定のタスクのみから利用される"専用"モジュールのようになっている．
+3. "専用"モジュールでないモジュールは，以下くらいだと思う:
+    * jiant/proj/main/export_model.py
+    * jiant/proj/main/modeling/heads.py
+    * jiant/proj/main/modeling/model_setup.py
+    * jiant/proj/main/modeling/taskmodels.py
+    * jiant/shared/model_resolution.py
+    * jiant/utils/transformer_utils.py
 
 
 

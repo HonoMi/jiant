@@ -4,6 +4,7 @@ import logging
 
 from jiant.ext.radam import RAdam
 from jiant.shared.model_resolution import ModelArchitectures, resolve_tokenizer_class
+from .optimization import get_linear_schedule_with_warmup_and_rewarmup
 
 logger = logging.getLogger(__name__)
 
@@ -72,6 +73,11 @@ def create_optimizer(
     t_total,
     warmup_steps,
     warmup_proportion,
+
+    t2_total=None,
+    rewarmup_steps=None,
+    rewarmup_proportion=None,
+
     optimizer_epsilon=1e-8,
     optimizer_type="adam",
     verbose=False,
@@ -82,6 +88,9 @@ def create_optimizer(
         t_total=t_total,
         warmup_steps=warmup_steps,
         warmup_proportion=warmup_proportion,
+        t2_total=t2_total,
+        rewarmup_steps=resolve_warmup_steps,
+        rewarmup_proportion=rewarmup_proportion,
         optimizer_epsilon=optimizer_epsilon,
         optimizer_type=optimizer_type,
         verbose=verbose,
@@ -94,6 +103,9 @@ def create_optimizer_from_params(
     t_total,
     warmup_steps,
     warmup_proportion,
+    t2_total=None,
+    rewarmup_steps=None,
+    rewarmup_proportion=None,
     optimizer_epsilon=1e-8,
     optimizer_type="adam",
     verbose=False,
@@ -148,9 +160,22 @@ def create_optimizer_from_params(
     warmup_steps = resolve_warmup_steps(
         t_total=t_total, warmup_steps=warmup_steps, warmup_proportion=warmup_proportion,
     )
-    scheduler = transformers.get_linear_schedule_with_warmup(
-        optimizer, num_warmup_steps=warmup_steps, num_training_steps=t_total
-    )
+    if any([t2_total is not None, rewarmup_steps is not None, rewarmup_proportion is not None]):
+        # first_annealing_warmup_steps,
+        # first_annealing_total_steps,
+        # second_annealing_warmup_steps,
+        # second_annealing_total_steps,
+        second_warmup_steps = resolve_warmup_steps(
+            t_total=t_total, warmup_steps=warmup_steps, warmup_proportion=warmup_proportion,
+        )
+
+        scheduler = get_linear_schedule_with_warmup_and_rewarmup(
+            optimizer, warmup_steps, t_total, second_warmup_steps, t2_total
+        )
+    else:
+        scheduler = transformers.get_linear_schedule_with_warmup(
+            optimizer, num_warmup_steps=warmup_steps, num_training_steps=t_total
+        )
     optimizer_scheduler = OptimizerScheduler(optimizer=optimizer, scheduler=scheduler)
     return optimizer_scheduler
 

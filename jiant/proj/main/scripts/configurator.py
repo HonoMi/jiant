@@ -99,11 +99,13 @@ class SingleTaskConfigurator(zconf.RunConfig):
     weighted_sampling_start_epoch = zconf.attr(type=int, default=0)  # zero start
     weighted_loss_start_step = zconf.attr(type=int, default=0)  # zero start
     weighted_loss_start_epoch = zconf.attr(type=int, default=0)  # zero start
+    no_rewarmup_in_second_stage = zconf.attr(action="store_true")
     fix_seed_for_weighted_sampler = zconf.attr(action="store_true")
     epochs = zconf.attr(type=int, default=None)
     max_steps = zconf.attr(type=int, default=None)
     num_gpus = zconf.attr(type=int, default=None)
     warmup_steps_proportion = zconf.attr(type=float, default=0.1)
+    rewarmup_steps_proportion = zconf.attr(type=float, default=0.1)
 
     def create_config(self):
         # === Get task config === #
@@ -182,6 +184,20 @@ class SingleTaskConfigurator(zconf.RunConfig):
         else:
             raise RuntimeError("Require either `eval_batch_size` or `eval_batch_multiplier`")
 
+        if self.weighted_sampling_start_step != 0 and self.weighted_loss_start_epoch != 0:
+            raise NotImplementedError()
+        else:
+            second_stage_start_steps = self.weighted_sampling_start_step or self.weighted_loss_start_step
+
+            first_stage_steps = second_stage_start_steps
+            warmup_steps = first_stage_steps * self.warmup_steps_proportion
+
+            second_stage_steps = max_steps - first_stage_steps
+            if self.no_rewarmup_in_second_stage:
+                rewarmup_steps = 0
+            else:
+                rewarmup_steps = second_stage_steps * self.rewarmup_steps_proportion
+
         # === Build configuration === #
         # Finally, we build our big config dictionary. Congrats!
         config_dict = {
@@ -190,9 +206,15 @@ class SingleTaskConfigurator(zconf.RunConfig):
             "sampler_config": {"sampler_type": "UniformMultiTaskSampler"},
             "global_train_config": {
                 "max_steps": int(max_steps),
-                "warmup_steps": int(max_steps * self.warmup_steps_proportion),
+                "first_stage_steps": first_stage_steps,
+                "second_stage_steps": second_stage_steps,
+
+                "warmup_steps": warmup_steps,
+                "rewarmup_steps": rewarmup_steps,
+
                 "weighted_sampling_start_step": self.weighted_sampling_start_step,
                 "weighted_loss_start_step": self.weighted_loss_start_step,
+
                 "fix_seed_for_weighted_sampler": self.fix_seed_for_weighted_sampler,
             },
             "task_specific_configs_dict": {
@@ -282,12 +304,14 @@ class SimpleAPIMultiTaskConfigurator(zconf.RunConfig):
     weighted_sampling_start_epoch = zconf.attr(type=int, default=1)
     weighted_loss_start_step = zconf.attr(type=int, default=0)
     weighted_loss_start_epoch = zconf.attr(type=int, default=1)
+    no_rewarmup_in_second_stage = zconf.attr(action="store_true")
     fix_seed_for_weighted_sampler = zconf.attr(action="store_true")
     epochs = zconf.attr(type=int, default=None)
     max_steps = zconf.attr(type=int, default=None)
     num_gpus = zconf.attr(type=int, default=None)
     train_examples_cap = zconf.attr(type=int, default=None)
     warmup_steps_proportion = zconf.attr(type=float, default=0.1)
+    rewarmup_steps_proportion = zconf.attr(type=float, default=0.1)
 
     @classmethod
     def parse_task_name_list(cls, task_name_list_arg):
@@ -449,6 +473,20 @@ class SimpleAPIMultiTaskConfigurator(zconf.RunConfig):
                 "task_to_unweighted_probs": capped_num_examples_dict,
             }
 
+        if self.weighted_sampling_start_step != 0 and self.weighted_loss_start_epoch != 0:
+            raise NotImplementedError()
+        else:
+            second_stage_start_steps = self.weighted_sampling_start_step or self.weighted_loss_start_step
+
+            first_stage_steps = second_stage_start_steps
+            warmup_steps = first_stage_steps * self.warmup_steps_proportion
+
+            second_stage_steps = max_steps - first_stage_steps
+            if self.no_rewarmup_in_second_stage:
+                rewarmup_steps = 0
+            else:
+                rewarmup_steps = second_stage_steps * self.rewarmup_steps_proportion
+
         # === Build configuration === #
         # Finally, we build our big config dictionary. Congrats!
         config_dict = {
@@ -458,7 +496,12 @@ class SimpleAPIMultiTaskConfigurator(zconf.RunConfig):
             "global_train_config": {
                 "max_steps": int(max_steps),
                 "steps_per_epoch": int(steps_per_epoch),
-                "warmup_steps": int(max_steps * self.warmup_steps_proportion),
+                "first_stage_steps": first_stage_steps,
+                "second_stage_steps": second_stage_steps,
+
+                "warmup_steps": warmup_steps,
+                "rewarmup_steps": rewarmup_steps,
+
                 "weighted_sampling_start_step": self.weighted_sampling_start_step,
                 "weighted_loss_start_step": self.weighted_loss_start_step,
                 "fix_seed_for_weighted_sampler": self.fix_seed_for_weighted_sampler,

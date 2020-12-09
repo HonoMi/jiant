@@ -24,8 +24,11 @@ class TaskSpecificConfig(ExtendedDataClassMixin):
 @dataclass
 class GlobalTrainConfig(ExtendedDataClassMixin):
     max_steps: int
+    first_stage_steps: int
+    second_stage_steps: int
     steps_per_epoch: int
     warmup_steps: int
+    rewarmup_steps: int
     weighted_sampling_start_step: int
     weighted_loss_start_step: int
     fix_seed_for_weighted_sampler: bool
