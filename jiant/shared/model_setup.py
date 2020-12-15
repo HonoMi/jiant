@@ -89,7 +89,7 @@ def create_optimizer(
         warmup_steps=warmup_steps,
         warmup_proportion=warmup_proportion,
         t2_total=t2_total,
-        rewarmup_steps=resolve_warmup_steps,
+        rewarmup_steps=rewarmup_steps,
         rewarmup_proportion=rewarmup_proportion,
         optimizer_epsilon=optimizer_epsilon,
         optimizer_type=optimizer_type,
@@ -166,7 +166,7 @@ def create_optimizer_from_params(
         # second_annealing_warmup_steps,
         # second_annealing_total_steps,
         second_warmup_steps = resolve_warmup_steps(
-            t_total=t_total, warmup_steps=warmup_steps, warmup_proportion=warmup_proportion,
+            t_total=t2_total, warmup_steps=rewarmup_steps, warmup_proportion=rewarmup_proportion,
         )
 
         scheduler = get_linear_schedule_with_warmup_and_rewarmup(

@@ -168,11 +168,18 @@ class SingleTaskConfigurator(zconf.RunConfig):
         else:
             raise RuntimeError("Require either `epochs` or `max_steps`")
 
-        if self.weighted_sampling_start_step == 0:
+        if self.weighted_sampling_start_epoch != 0:
+            if self.weighted_sampling_start_step != 0:
+                raise ValueError('Only one of "weighted-sampling-start-epoch" or "weighted-sampling-start-step" can be specified.')
             self.weighted_sampling_start_step = self.weighted_sampling_start_epoch * steps_per_epoch
-
-        if self.weighted_loss_start_step == 0:
+        if self.weighted_loss_start_epoch != 0:
+            if self.weighted_loss_start_step != 0:
+                raise ValueError('Only one of "weighted-loss-start-epoch" or "weighted-loss-start-step" can be specified.')
             self.weighted_loss_start_step = self.weighted_loss_start_epoch * steps_per_epoch
+        if self.train_sample_weights is None:
+            self.weighted_sampling_start_step = 0
+        if self.train_loss_weights is None:
+            self.weighted_loss_start_step = 0
 
         # === Compute eval_batch_size === #
         if self.eval_batch_size is not None:
@@ -445,10 +452,18 @@ class SimpleAPIMultiTaskConfigurator(zconf.RunConfig):
         if max_steps_not_given:
             max_steps += self.epochs * steps_per_epoch
 
-        if self.weighted_sampling_start_step == 0:
+        if self.weighted_sampling_start_epoch != 0:
+            if self.weighted_sampling_start_step != 0:
+                raise ValueError('Only one of "weighted-sampling-start-epoch" or "weighted-sampling-start-step" can be specified.')
             self.weighted_sampling_start_step = self.weighted_sampling_start_epoch * steps_per_epoch
-        if self.weighted_loss_start_step == 0:
+        if self.weighted_loss_start_epoch != 0:
+            if self.weighted_loss_start_step != 0:
+                raise ValueError('Only one of "weighted-loss-start-epoch" or "weighted-loss-start-step" can be specified.')
             self.weighted_loss_start_step = self.weighted_loss_start_epoch * steps_per_epoch
+        if self.train_sample_weights is None:
+            self.weighted_sampling_start_step = 0
+        if self.train_loss_weights is None:
+            self.weighted_loss_start_step = 0
 
         # === Compute eval_batch_size === #
         # Eval batch size is often a multiple of train batch size,

@@ -103,17 +103,6 @@ def setup_runner(
         )
         jiant_model.to(quick_init_out.device)
 
-    # jiant_task_container.global_train_config.weighted_loss_start_step
-    # jiant_task_container.global_train_config.weighted_sampling_start_step
-    # "global_train_config": {
-    #     "max_steps": int(max_steps),
-    #     "warmup_steps": int(max_steps * self.warmup_steps_proportion),
-    #     "weighted_sampling_start_step": self.weighted_sampling_start_step,
-    #     "weighted_loss_start_step": self.weighted_loss_start_step,
-    #     "no_rewarmup_in_second_stage": self.no_rewarmup_in_second_stage,
-    #     "fix_seed_for_weighted_sampler": self.fix_seed_for_weighted_sampler,
-    # },
-
     global_train_config = jiant_task_container.global_train_config
     optimizer_scheduler = model_setup.create_optimizer(
         model=jiant_model,
