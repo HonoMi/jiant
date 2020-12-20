@@ -60,6 +60,19 @@
     * jiant/shared/model_resolution.py
     * jiant/utils/transformer_utils.py
 
+## hyperparameterは何がよいですか？
+* [BERT論文](https://arxiv.org/pdf/1810.04805.pdf)を参考にすること．
+    - lrate: [2e-5, 5e-5]
+    - epochs: 3
+    - ただし，「小さいデータセットだとハイパラ依存性が高いので，bestなところを探した」，とも書いてある．
+* lrate:
+    - `3e-5 >> 5e-5`
+        * 特に，5e-5だと高すぎて学習曲線が発狂するタスクもある．
+- epochs: lrate=3e-5で，5epoch．
+    - 少し足りていないかも．
+
+
+
 
 
 
