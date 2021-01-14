@@ -39,9 +39,9 @@ def load_hf_dataset(path,
             raise ValueError(f'Unknown split type "{split_type}"')
 
         hf_local_dataset = load_dataset(path=path,
-                                                 name=name,
-                                                 version=version,
-                                                 split=hf_local_phase)
+                                        name=name,
+                                        version=version,
+                                        split=hf_local_phase)
         cv_dataset = build_cv_splits(
             hf_local_dataset,
             n_fold,
@@ -85,11 +85,6 @@ def convert_hf_dataset_to_examples(
                               n_fold=n_fold,
                               fold=fold)
 
-    metric = load_metric(path,
-                         config_name=name,
-                         experiment_id=experiment_id_for_metric,
-                         cache_dir=cache_dir_for_metric)
-
     if phase_list is None:
         phase_list = dataset.keys()
     examples_dict = {}
@@ -120,6 +115,10 @@ def convert_hf_dataset_to_examples(
     if return_hf_dataset:
         ret.append(dataset)
     if return_hf_metric:
+        metric = load_metric(path,
+                             config_name=name,
+                             experiment_id=experiment_id_for_metric,
+                             cache_dir=cache_dir_for_metric)
         ret.append(metric)
     return ret
 

@@ -172,9 +172,15 @@ HF_DATASETS_CONVERSION_DICT = {
 DEFAULT_PHASE_MAP = {"validation": "val"}
 
 
-def build_examples(task_name, n_fold: int = None, fold: int = None, return_hf_dataset=False, return_hf_metric=False, experiment_id_for_metric=None, cache_dir_for_metric=None):
+def build_examples(task_name: str,
+                   n_fold: int = None,
+                   fold: int = None,
+                   return_hf_dataset=False,
+                   return_hf_metric=False,
+                   experiment_id_for_metric=None,
+                   cache_dir_for_metric=None):
     hf_datasets_conversion_metadata = HF_DATASETS_CONVERSION_DICT[task_name]
-    ret = download_utils.convert_hf_dataset_to_examples(
+    return download_utils.convert_hf_dataset_to_examples(
         path=hf_datasets_conversion_metadata["path"],
         name=hf_datasets_conversion_metadata.get("name"),
         field_map=hf_datasets_conversion_metadata.get("field_map"),
@@ -188,10 +194,13 @@ def build_examples(task_name, n_fold: int = None, fold: int = None, return_hf_da
         experiment_id_for_metric=experiment_id_for_metric,
         cache_dir_for_metric=cache_dir_for_metric,
     )
-    return ret
 
 
-def download_data_and_write_config(task_name: str, task_data_path: str, task_config_path: str, n_fold: int = None, fold: int = None):
+def download_data_and_write_config(task_name: str,
+                                   task_data_path: str,
+                                   task_config_path: str,
+                                   n_fold: int = None,
+                                   fold: int = None):
     examples_dict = build_examples(task_name, n_fold=n_fold, fold=fold)
     paths_dict = download_utils.write_examples_to_jsonls(
         examples_dict=examples_dict, task_data_path=task_data_path,
