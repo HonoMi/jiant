@@ -62,6 +62,7 @@ class RunConfiguration(zconf.RunConfig):
     adam_epsilon = zconf.attr(default=1e-8, type=float)
     max_grad_norm = zconf.attr(default=1.0, type=float)
     optimizer_type = zconf.attr(default="adam", type=str)
+    freeze_encoder = zconf.attr(default=False, type=bool, action="store_true")
     seed = zconf.attr(type=int, default=-1)
 
 
@@ -117,6 +118,7 @@ def setup_runner(
         rewarmup_proportion=None,
 
         optimizer_type=args.optimizer_type,
+        freeze_encoder=args.freeze_encoder,
         verbose=verbose,
     )
     jiant_model, optimizer = model_setup.raw_special_model_setup(

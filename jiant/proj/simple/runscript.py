@@ -60,6 +60,7 @@ class RunConfiguration(zconf.RunConfig):
     adam_epsilon = zconf.attr(default=1e-8, type=float)
     max_grad_norm = zconf.attr(default=1.0, type=float)
     optimizer_type = zconf.attr(default="adam", type=str)
+    freeze_encoder = zconf.attr(default=False, type=bool, action="store_true")
 
     # === Specialized config === #
     no_cuda = zconf.attr(action="store_true")
@@ -242,6 +243,7 @@ def run_simple(args: RunConfiguration, with_continue: bool = False):
             adam_epsilon=args.adam_epsilon,
             max_grad_norm=args.max_grad_norm,
             optimizer_type=args.optimizer_type,
+            freeze_encoder=args.freeze_encoder,
             # === Specialized config === #
             no_cuda=args.no_cuda,
             fp16=args.fp16,

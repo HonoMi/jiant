@@ -80,15 +80,12 @@ def create_optimizer(
 
     optimizer_epsilon=1e-8,
     optimizer_type="adam",
+    freeze_encoder=False,
     verbose=False,
 ):
-    # from jiant.proj.main.modeling.model_setup import get_encoder
-    # from jiant.shared.model_setup import ModelArchitectures
-    # import pudb; pudb.set_trace()
-    # encoder = get_encoder(ModelArchitectures.BART, model.encoder)
 
     return create_optimizer_from_params(
-        named_parameters=list(model.named_parameters()),
+        model,
         learning_rate=learning_rate,
         t_total=t_total,
         warmup_steps=warmup_steps,
@@ -98,12 +95,13 @@ def create_optimizer(
         rewarmup_proportion=rewarmup_proportion,
         optimizer_epsilon=optimizer_epsilon,
         optimizer_type=optimizer_type,
+        freeze_encoder=freeze_encoder,
         verbose=verbose,
     )
 
 
 def create_optimizer_from_params(
-    named_parameters,
+    model,
     learning_rate,
     t_total,
     warmup_steps,
@@ -113,8 +111,11 @@ def create_optimizer_from_params(
     rewarmup_proportion=None,
     optimizer_epsilon=1e-8,
     optimizer_type="adam",
+    freeze_encoder=False,
     verbose=False,
 ):
+    all_named_parameters = list(model.named_parameters())
+    # import pudb; pudb.set_trace()
     # Prepare optimizer
     no_decay = [
         "bias",
@@ -126,9 +127,25 @@ def create_optimizer_from_params(
     ]
     if verbose:
         logger.info("No optimizer decay for:")
-        for n, p in named_parameters:
+        for n, p in all_named_parameters:
             if any(nd in n for nd in no_decay):
                 logger.info(f"  {n}")
+
+    optimizer_grouped_parameters = []
+
+    if freeze_encoder:
+        logger.info('freeze encoder: the parameters of encoder will not be updated.')
+        encoder = list(model.children())[0]
+        encoder_parameter_names = [f'encoder.{name}' for name, _ in encoder.named_parameters()]
+        encoder_parameters = [val for name, val in model.named_parameters()
+                              if name in encoder_parameter_names]
+
+        optimizer_grouped_parameters.append({"params": encoder_parameters, "lr": 0.0})
+
+        named_parameters = [(name, val) for name, val in model.named_parameters()
+                            if name not in encoder_parameter_names]
+    else:
+        named_parameters = all_named_parameters
 
     used_named_parameters = [
         (n, p) for n, p in named_parameters if p.requires_grad and "weighted_sum.weights" not in n
@@ -137,7 +154,7 @@ def create_optimizer_from_params(
         (n, p) for n, p in named_parameters if p.requires_grad and "weighted_sum.weights" in n
     ]
 
-    optimizer_grouped_parameters = [
+    optimizer_grouped_parameters.extend([
         {
             "params": [p for n, p in used_named_parameters if not any(nd in n for nd in no_decay)],
             "weight_decay": 0.01,
@@ -147,7 +164,7 @@ def create_optimizer_from_params(
             "weight_decay": 0.0,
         },
         {"params": [p for n, p in weighted_sum_params], "weight_decay": 0.0, "lr": 0.01},
-    ]
+    ])
 
     if optimizer_type == "adam":
         if verbose:

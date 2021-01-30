@@ -15,6 +15,7 @@ class ModelArchitectures(Enum):
     BART = 6
     MBART = 7
     ELECTRA = 8
+    gpt = 9
 
     @classmethod
     def from_model_type(cls, model_type: str):
