@@ -175,10 +175,10 @@ DEFAULT_PHASE_MAP = {"validation": "val"}
 def build_examples(task_name: str,
                    n_fold: int = None,
                    fold: int = None,
-                   return_hf_dataset=False,
-                   return_hf_metric=False,
+                   return_all: bool = False,
                    experiment_id_for_metric=None,
-                   cache_dir_for_metric=None):
+                   cache_dir_for_metric=None,
+                   return_original_dataset: bool = False):
     hf_datasets_conversion_metadata = HF_DATASETS_CONVERSION_DICT[task_name]
     return download_utils.convert_hf_dataset_to_examples(
         path=hf_datasets_conversion_metadata["path"],
@@ -189,8 +189,7 @@ def build_examples(task_name: str,
         phase_list=hf_datasets_conversion_metadata.get("phase_list"),
         n_fold=n_fold,
         fold=fold,
-        return_hf_dataset=return_hf_dataset,
-        return_hf_metric=return_hf_metric,
+        return_all=return_all,
         experiment_id_for_metric=experiment_id_for_metric,
         cache_dir_for_metric=cache_dir_for_metric,
     )

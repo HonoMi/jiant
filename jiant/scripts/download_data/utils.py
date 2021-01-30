@@ -20,10 +20,10 @@ def load_hf_dataset(path,
     phase_map = phase_map or {}
     split_type = split_type or 'local_evaluation'
 
-    dataset = load_dataset(path=path, name=name, version=version)
+    dataset_dict = load_dataset(path=path, name=name, version=version)
 
     for old_phase_name, new_phase_name in phase_map.items():
-        replace_key(dataset, old_key=old_phase_name, new_key=new_phase_name)
+        replace_key(dataset_dict, old_key=old_phase_name, new_key=new_phase_name)
 
     if n_fold is not None:
         jiant2hf_phase_map = {val: key for key, val in phase_map.items()}
@@ -32,7 +32,7 @@ def load_hf_dataset(path,
 
         if split_type == 'local_evaluation':
             hf_local_phase = '+'.join([hf_train_phase])
-            dataset['test'] = dataset['val']
+            dataset_dict['test'] = dataset_dict['val']
         elif split_type == 'submission':
             hf_local_phase = '+'.join([hf_train_phase, hf_val_phase])
         else:
@@ -47,19 +47,16 @@ def load_hf_dataset(path,
             n_fold,
             stratify=False,
         )
-        dataset['train'] = cv_dataset[f'cv-{fold}.train']
-        dataset['val'] = cv_dataset[f'cv-{fold}.val']
+        dataset_dict['train'] = cv_dataset[f'fold-{fold}.train']
+        dataset_dict['val'] = cv_dataset[f'fold-{fold}.val']
 
-        # re-index
-
-    return dataset
+    return dataset_dict
 
 
 def convert_hf_dataset_to_examples(
     path, name=None, version=None, field_map=None, label_map=None, phase_map=None, phase_list=None,
     n_fold: int = None, fold: int = None,
-    return_hf_dataset=False,
-    return_hf_metric=False,
+    return_all: bool = False,
     experiment_id_for_metric=None,
     cache_dir_for_metric=None,
 ):
@@ -78,19 +75,19 @@ def convert_hf_dataset_to_examples(
         Dict[phase] -> list[examples]
     """
     # "mrpc.cv-5-0"
-    dataset = load_hf_dataset(path=path,
-                              name=name,
-                              version=version,
-                              phase_map=phase_map,
-                              n_fold=n_fold,
-                              fold=fold)
+    fold_dataset = load_hf_dataset(path=path,
+                                   name=name,
+                                   version=version,
+                                   phase_map=phase_map,
+                                   n_fold=n_fold,
+                                   fold=fold)
 
     if phase_list is None:
-        phase_list = dataset.keys()
+        phase_list = fold_dataset.keys()
     examples_dict = {}
     for phase in phase_list:
         phase_examples = []
-        for raw_example in dataset[phase]:
+        for raw_example in fold_dataset[phase]:
             if field_map:
                 for old_field_name, new_field_name in field_map.items():
                     replace_key(raw_example, old_key=old_field_name, new_key=new_field_name)
@@ -108,19 +105,17 @@ def convert_hf_dataset_to_examples(
             phase_examples.append(raw_example)
         examples_dict[phase] = phase_examples
 
-    if not return_hf_dataset and not return_hf_metric:
-        return examples_dict
+    metric = load_metric(path,
+                         config_name=name,
+                         experiment_id=experiment_id_for_metric,
+                         cache_dir=cache_dir_for_metric)
 
-    ret = [examples_dict]
-    if return_hf_dataset:
-        ret.append(dataset)
-    if return_hf_metric:
-        metric = load_metric(path,
-                             config_name=name,
-                             experiment_id=experiment_id_for_metric,
-                             cache_dir=cache_dir_for_metric)
-        ret.append(metric)
-    return ret
+    if return_all:
+        return examples_dict, {'hf_fold_dataset': fold_dataset,
+                               # 'hf_full_dataset': full_dataset,
+                               'hf_metric': metric}
+    else:
+        return examples_dict
 
 
 def write_examples_to_jsonls(examples_dict, task_data_path, skip_if_exists=False):
