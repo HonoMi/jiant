@@ -82,6 +82,11 @@ def create_optimizer(
     optimizer_type="adam",
     verbose=False,
 ):
+    # from jiant.proj.main.modeling.model_setup import get_encoder
+    # from jiant.shared.model_setup import ModelArchitectures
+    # import pudb; pudb.set_trace()
+    # encoder = get_encoder(ModelArchitectures.BART, model.encoder)
+
     return create_optimizer_from_params(
         named_parameters=list(model.named_parameters()),
         learning_rate=learning_rate,

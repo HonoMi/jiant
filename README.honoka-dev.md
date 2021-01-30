@@ -49,17 +49,6 @@
         - jiant val  : CV val (0-fold目のvalidation)
         - jiant test : **jiant val**
 
-## 新規モデルタイプの追加
-1. `grep "Bert|BERT" ./jiant` で出てくるモジュールが，transformer のタイプ依存の処理を行っていると予測できる．
-2. 一方で，上記モジュールの一部は，特定のタスクのみから利用される"専用"モジュールのようになっている．
-3. "専用"モジュールでないモジュールは，以下くらいだと思う:
-    * jiant/proj/main/export_model.py
-    * jiant/proj/main/modeling/heads.py
-    * jiant/proj/main/modeling/model_setup.py
-    * jiant/proj/main/modeling/taskmodels.py
-    * jiant/shared/model_resolution.py
-    * jiant/utils/transformer_utils.py
-
 ## hyperparameterは何がよいですか？
 * [BERT論文](https://arxiv.org/pdf/1810.04805.pdf)を参考にすること．
     - lrate: [2e-5, 5e-5]
@@ -71,7 +60,45 @@
 - epochs: lrate=3e-5で，5epoch．
     - 少し足りていないかも．
 
+## Jiantのモデル構造
+1. `jiant/shared/model_resolution.py`
+    - BERTなど，各モデルタイプの型や・出力特徴量の型を定義する．
+2. `jiant/proj/main/export_model.py`
+    - transformersのモデルをダウンロードする．
+    - このときのモデルは，`BertForPreTraining`など，pure encoder + top-layer から構築される．
+    - このtop-layerは，次段のモジュールによって，jinatが定義するtop-layerに取り替えられる．
+3. `jiant/proj/main/modeling/model_setup.py`
+    - jiantのモデルを作成する．
+    - このモジュールで，transformersのtop-layerが排除される:
+        ```
+            ancestor_model = get_ancestor_model(
+                transformers_class_spec=transformers_class_spec, model_config_path=model_config_path,
+            )
+            encoder = get_encoder(model_arch=model_arch, ancestor_model=ancestor_model)
+        ```
+    - そして，jiantが定義するtop-layerが追加される．
+        ```
+        if task.TASK_TYPE == TaskTypes.CLASSIFICATION:
+            assert taskmodel_kwargs is None
+            classification_head = heads.ClassificationHead(
+                hidden_size=hidden_size,
+                hidden_dropout_prob=hidden_dropout_prob,
+                num_labels=len(task.LABELS),
+            )
+            taskmodel = taskmodels.ClassificationModel(
+                encoder=encoder, classification_head=classification_head,
+            )
+        ```
 
+## 新規モデルタイプの追加
+* `grep "Bert|BERT" ./jiant` で出てくるモジュールに，モデルタイプごとの処理を加えればよいと考えられる．
+* ただし，以下のモジュールは，特定のタスクのみから利用される"専用"モジュールのようになっている．よって，当該タスクを必要としないなら，実装しなくてもよい．
+    * jiant/proj/main/export_model.py
+    * jiant/proj/main/modeling/heads.py
+    * jiant/proj/main/modeling/model_setup.py
+    * jiant/proj/main/modeling/taskmodels.py
+    * jiant/shared/model_resolution.py
+    * jiant/utils/transformer_utils.py
 
 
 
