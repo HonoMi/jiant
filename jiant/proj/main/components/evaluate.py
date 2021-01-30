@@ -77,3 +77,11 @@ def write_preds(eval_results_dict: dict, path: str):
 
     df = pd.DataFrame(df_dict)
     jsonify_df(df).to_csv(path.rstrip('.p') + '.tsv', sep='\t', index=None)
+
+
+def write_encoder_outputs(eval_results_dict: dict, output_dir: str):
+    for task, results in eval_results_dict.items():
+        _output_dir = os.path.join(output_dir, f'task={task}')
+        os.makedirs(_output_dir, exist_ok=True)
+        np.save(_output_dir + '/encoder_outputs_pooled.npy', results['encoder_outputs_pooled'])
+        np.save(_output_dir + '/encoder_outputs_unpooled.npy', results['encoder_outputs_unpooled'])

@@ -34,13 +34,22 @@ class RunConfiguration(zconf.RunConfig):
     do_train = zconf.attr(action="store_true")
     do_train_eval = zconf.attr(action="store_true")
     do_val = zconf.attr(action="store_true")
+    do_test = zconf.attr(action="store_true")
+
     do_save = zconf.attr(action="store_true")
-    write_train_preds = zconf.attr(action="store_true")
     do_save_last = zconf.attr(action="store_true")
     do_save_best = zconf.attr(action="store_true")
+
     load_last_model = zconf.attr(action="store_true")
+
+    write_train_preds = zconf.attr(action="store_true")
     write_val_preds = zconf.attr(action="store_true")
     write_test_preds = zconf.attr(action="store_true")
+
+    write_train_encoder_outputs = zconf.attr(action="store_true")
+    write_val_encoder_outputs = zconf.attr(action="store_true")
+    write_test_encoder_outputs = zconf.attr(action="store_true")
+
     eval_every_steps = zconf.attr(type=int, default=0)
     eval_every_epochs = zconf.attr(type=int, default=0)
     save_every_steps = zconf.attr(type=int, default=0)
@@ -189,66 +198,82 @@ def run_loop(args: RunConfiguration, checkpoint=None):
                 del checkpoint["metarunner_state"]
             metarunner.run_train_loop()
 
-        # if args.do_save:
-        #     torch.save(
-        #         torch_utils.get_model_for_saving(runner.jiant_model).state_dict(),
-        #         os.path.join(args.output_dir, "model.p"),
-        #     )
-
-        if args.do_train_eval:
+        if args.do_train_eval or args.write_train_preds or args.write_train_encoder_outputs:
             train_eval_results_dict = runner.run_train_eval(
                 task_name_list=runner.jiant_task_container.task_run_config.train_task_list,
                 return_preds=args.write_train_preds,
                 global_step=None,
+                return_encoder_output=(True if args.write_train_encoder_outputs else False),
             )
-            jiant_evaluate.write_train_eval_results(
-                results_dict=train_eval_results_dict,
-                metrics_aggregator=runner.jiant_task_container.metrics_aggregator,
-                output_dir=args.output_dir,
-                verbose=True,
-            )
+            if args.do_train_eval:
+                jiant_evaluate.write_train_eval_results(
+                    results_dict=train_eval_results_dict,
+                    metrics_aggregator=runner.jiant_task_container.metrics_aggregator,
+                    output_dir=args.output_dir,
+                    verbose=True,
+                )
             if args.write_train_preds:
                 jiant_evaluate.write_preds(
                     eval_results_dict=train_eval_results_dict,
                     path=os.path.join(args.output_dir, "train_preds.p"),
                 )
+            if args.write_train_encoder_outputs:
+                jiant_evaluate.write_encoder_outputs(
+                    eval_results_dict=train_eval_results_dict,
+                    output_dir=args.output_dir,
+                )
         else:
             assert not args.write_val_preds
 
-        if args.do_val:
+        if args.do_val or args.write_val_preds or args.write_val_encoder_outputs:
             val_results_dict = runner.run_val(
                 task_name_list=runner.jiant_task_container.task_run_config.val_task_list,
                 return_preds=args.write_val_preds,
+                return_encoder_output=(True if args.write_val_encoder_outputs else False),
             )
-            jiant_evaluate.write_val_results(
-                results_dict=val_results_dict,
-                metrics_aggregator=runner.jiant_task_container.metrics_aggregator,
-                output_dir=args.output_dir,
-                verbose=True,
-            )
+            if args.do_val:
+                jiant_evaluate.write_val_results(
+                    results_dict=val_results_dict,
+                    metrics_aggregator=runner.jiant_task_container.metrics_aggregator,
+                    output_dir=args.output_dir,
+                    verbose=True,
+                )
             if args.write_val_preds:
                 jiant_evaluate.write_preds(
                     eval_results_dict=val_results_dict,
                     path=os.path.join(args.output_dir, "val_preds.p"),
                 )
+            if args.write_val_encoder_outputs:
+                jiant_evaluate.write_encoder_outputs(
+                    eval_results_dict=val_results_dict,
+                    output_dir=args.output_dir,
+                )
         else:
             assert not args.write_val_preds
 
-        if args.write_test_preds:
+        if args.do_test or args.write_test_preds or args.write_test_encoder_outputs:
             test_results_dict = runner.run_test(
                 task_name_list=runner.jiant_task_container.task_run_config.test_task_list,
                 return_preds=args.write_test_preds,
+                return_encoder_output=(True if args.write_test_encoder_outputs else False),
             )
-            jiant_evaluate.write_test_results(
-                results_dict=test_results_dict,
-                metrics_aggregator=runner.jiant_task_container.metrics_aggregator,
-                output_dir=args.output_dir,
-                verbose=True,
-            )
-            jiant_evaluate.write_preds(
-                eval_results_dict=test_results_dict,
-                path=os.path.join(args.output_dir, "test_preds.p"),
-            )
+            if args.do_test:
+                jiant_evaluate.write_test_results(
+                    results_dict=test_results_dict,
+                    metrics_aggregator=runner.jiant_task_container.metrics_aggregator,
+                    output_dir=args.output_dir,
+                    verbose=True,
+                )
+            if args.write_test_preds:
+                jiant_evaluate.write_preds(
+                    eval_results_dict=test_results_dict,
+                    path=os.path.join(args.output_dir, "test_preds.p"),
+                )
+            if args.write_test_encoder_outputs:
+                jiant_evaluate.write_encoder_outputs(
+                    eval_results_dict=test_results_dict,
+                    output_dir=args.output_dir,
+                )
 
     if (
         not args.keep_checkpoint_when_done

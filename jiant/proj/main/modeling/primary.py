@@ -24,7 +24,7 @@ class JiantModel(nn.Module):
         self.task_to_taskmodel_map = task_to_taskmodel_map
         self.tokenizer = tokenizer
 
-    def forward(self, batch: tasks.BatchMixin, task: tasks.Task, compute_loss: bool = False, loss_weights: torch.Tensor=None):
+    def forward(self, batch: tasks.BatchMixin, task: tasks.Task, compute_loss: bool = False, loss_weights: torch.Tensor=None, get_encoder_output=False):
         """Calls to this forward method are delegated to the forward of the appropriate taskmodel.
 
         When JiantModel forward is called, the task name from the task argument is used as a key
@@ -49,9 +49,10 @@ class JiantModel(nn.Module):
             task = task
         taskmodel_key = self.task_to_taskmodel_map[task_name]
         taskmodel = self.taskmodels_dict[taskmodel_key]
-        return taskmodel(
-            batch=batch, task=task, tokenizer=self.tokenizer, compute_loss=compute_loss, loss_weights=loss_weights
-        ).to_dict()
+        ret = taskmodel(
+            batch=batch, task=task, tokenizer=self.tokenizer, compute_loss=compute_loss, loss_weights=loss_weights, get_encoder_output=get_encoder_output,
+        )
+        return (ret[0].to_dict(), ret[1]) if get_encoder_output else ret.to_dict()
 
 
 def wrap_jiant_forward(
@@ -60,6 +61,7 @@ def wrap_jiant_forward(
     task: tasks.Task,
     compute_loss: bool = False,
     loss_weights: torch.Tensor = None,
+    get_encoder_output: bool = False,
 ):
     """Wrapper to repackage model inputs using dictionaries for compatibility with DataParallel.
 
@@ -79,12 +81,18 @@ def wrap_jiant_forward(
     """
     assert isinstance(jiant_model, (JiantModel, nn.DataParallel))
     is_multi_gpu = isinstance(jiant_model, nn.DataParallel)
-    model_output = construct_output_from_dict(
-        jiant_model(
+    jiant_model_output = jiant_model(
             batch=batch.to_dict() if is_multi_gpu else batch, task=task, compute_loss=compute_loss,
             loss_weights=loss_weights,
-        )
+            get_encoder_output=get_encoder_output,
     )
-    if is_multi_gpu:
-        model_output.loss = model_output.loss.mean()
-    return model_output
+    if get_encoder_output:
+        model_output = construct_output_from_dict(jiant_model_output[0])
+        if is_multi_gpu:
+            model_output.loss = model_output.loss.mean()
+        return model_output, jiant_model_output[1]
+    else:
+        model_output = construct_output_from_dict(jiant_model_output)
+        if is_multi_gpu:
+            model_output.loss = model_output.loss.mean()
+        return model_output

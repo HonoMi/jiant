@@ -26,7 +26,7 @@ class ClassificationModel(Taskmodel):
         super().__init__(encoder=encoder)
         self.classification_head = classification_head
 
-    def forward(self, batch, task, tokenizer, compute_loss: bool = False, loss_weights: torch.Tensor = None):
+    def forward(self, batch, task, tokenizer, compute_loss: bool = False, loss_weights: torch.Tensor = None, get_encoder_output: bool = False):
         encoder_output = get_output_from_encoder_and_batch(encoder=self.encoder, batch=batch)
         logits = self.classification_head(pooled=encoder_output.pooled)
         if compute_loss:
@@ -41,9 +41,10 @@ class ClassificationModel(Taskmodel):
                 loss = loss_fct(
                     logits.view(-1, self.classification_head.num_labels), batch.label_id.view(-1),
                 )
-            return LogitsAndLossOutput(logits=logits, loss=loss, other=encoder_output.other)
+            results = LogitsAndLossOutput(logits=logits, loss=loss, other=encoder_output.other)
         else:
-            return LogitsOutput(logits=logits, other=encoder_output.other)
+            results = LogitsOutput(logits=logits, other=encoder_output.other)
+        return (results, StaticEncoderOutput(encoder_output)) if get_encoder_output else results
 
 
 class RegressionModel(Taskmodel):
@@ -51,7 +52,7 @@ class RegressionModel(Taskmodel):
         super().__init__(encoder=encoder)
         self.regression_head = regression_head
 
-    def forward(self, batch, task, tokenizer, compute_loss: bool = False, loss_weights: torch.Tensor = None):
+    def forward(self, batch, task, tokenizer, compute_loss: bool = False, loss_weights: torch.Tensor = None, get_encoder_output: bool = False):
         encoder_output = get_output_from_encoder_and_batch(encoder=self.encoder, batch=batch)
         # TODO: Abuse of notation - these aren't really logits  (issue #1187)
         logits = self.regression_head(pooled=encoder_output.pooled)
@@ -63,9 +64,10 @@ class RegressionModel(Taskmodel):
             else:
                 loss_fct = nn.MSELoss()
                 loss = loss_fct(logits.view(-1), batch.label.view(-1))
-            return LogitsAndLossOutput(logits=logits, loss=loss, other=encoder_output.other)
+            results = LogitsAndLossOutput(logits=logits, loss=loss, other=encoder_output.other)
         else:
-            return LogitsOutput(logits=logits, other=encoder_output.other)
+            results = LogitsOutput(logits=logits, other=encoder_output.other)
+        return (results, StaticEncoderOutput(encoder_output)) if get_encoder_output else results
 
 
 class MultipleChoiceModel(Taskmodel):
@@ -80,7 +82,7 @@ class MultipleChoiceModel(Taskmodel):
         input_mask = batch.input_mask
 
         choice_score_list = []
-        encoder_output_other_ls = []
+        encoder_outputs_other_ls = []
         for i in range(self.num_choices):
             encoder_output = get_output_from_encoder(
                 encoder=self.encoder,
@@ -90,15 +92,15 @@ class MultipleChoiceModel(Taskmodel):
             )
             choice_score = self.choice_scoring_head(pooled=encoder_output.pooled)
             choice_score_list.append(choice_score)
-            encoder_output_other_ls.append(encoder_output.other)
+            encoder_outputs_other_ls.append(encoder_output.other)
 
         reshaped_outputs = []
-        if encoder_output_other_ls[0]:
-            for j in range(len(encoder_output_other_ls[0])):
+        if encoder_outputs_other_ls[0]:
+            for j in range(len(encoder_outputs_other_ls[0])):
                 reshaped_outputs.append(
                     [
-                        torch.stack([misc[j][layer_i] for misc in encoder_output_other_ls], dim=1)
-                        for layer_i in range(len(encoder_output_other_ls[0][0]))
+                        torch.stack([misc[j][layer_i] for misc in encoder_outputs_other_ls], dim=1)
+                        for layer_i in range(len(encoder_outputs_other_ls[0][0]))
                     ]
                 )
             reshaped_outputs = tuple(reshaped_outputs)
@@ -295,6 +297,14 @@ class EncoderOutput:
     unpooled: torch.Tensor
     other: Any = None
     # Extend later with attention, hidden_acts, etc
+
+
+class StaticEncoderOutput:
+
+    def __init__(self, output: EncoderOutput):
+        self.pooled = output.pooled.detach().cpu().numpy()
+        self.unpooled = output.unpooled.detach().cpu().numpy()
+        # self.other = output.other.detach().cpu().numpy() if output.other is not None else None
 
 
 def get_output_from_encoder_and_batch(encoder, batch) -> EncoderOutput:

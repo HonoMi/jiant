@@ -209,6 +209,7 @@ class JiantRunner:
                        global_step: Optional[int] = None,
                        use_subset=None,
                        return_preds=False,
+                       return_encoder_output=False,
                        verbose=True):
         dataloader_dict = self.get_train_dataloader_dict(for_eval=True,)
         labels_dict = self.get_train_labels_dict(
@@ -221,6 +222,7 @@ class JiantRunner:
                               phase=PHASE.TRAIN,
                               use_subset=use_subset,
                               return_preds=return_preds,
+                              return_encoder_output=return_encoder_output,
                               split='train')
 
     def run_val(self,
@@ -228,6 +230,7 @@ class JiantRunner:
                 global_step: Optional[int] = None,
                 use_subset=None,
                 return_preds=False,
+                return_encoder_output=False,
                 verbose=True):
         dataloader_dict = self.get_val_dataloader_dict(
             task_name_list=task_name_list, use_subset=use_subset
@@ -242,16 +245,19 @@ class JiantRunner:
                               phase=PHASE.VAL,
                               use_subset=use_subset,
                               return_preds=return_preds,
+                              return_encoder_output=return_encoder_output,
                               split='valid')
 
-    def run_test(self, task_name_list, use_subset=None, return_preds=False, verbose=True):
+    def run_test(self, task_name_list, use_subset=None, return_preds=False, verbose=True, return_encoder_output=False):
         dataloader_dict = self.get_test_dataloader_dict()
         labels_dict = self.get_test_labels_dict(
             task_name_list=task_name_list, use_subset=use_subset,
         )
 
         return self._run_eval(task_name_list, dataloader_dict, labels_dict,
-                              phase=PHASE.TEST, use_subset=use_subset, return_preds=return_preds, split='test')
+                              phase=PHASE.TEST, use_subset=use_subset,
+                              return_preds=return_preds, return_encoder_output=return_encoder_output,
+                              split='test')
 
     def _run_eval(self,
                   task_name_list,
@@ -261,6 +267,7 @@ class JiantRunner:
                   phase=None,
                   use_subset=None,
                   return_preds=False,
+                  return_encoder_output=False,
                   verbose=True,
                   split='valid'):
         evaluate_dict = {}
@@ -277,25 +284,11 @@ class JiantRunner:
                 tf_writer=self.tf_writer,
                 global_step=global_step,
                 return_preds=return_preds,
+                return_encoder_output=return_encoder_output,
                 verbose=verbose,
                 split=split,
             )
         return evaluate_dict
-
-    # def run_test(self, task_name_list, verbose=True):
-    #     evaluate_dict = {}
-    #     test_dataloader_dict = self.get_test_dataloader_dict()
-    #     for task_name in task_name_list:
-    #         task = self.jiant_task_container.task_dict[task_name]
-    #         evaluate_dict[task_name] = run_test(
-    #             test_dataloader=test_dataloader_dict[task_name],
-    #             jiant_model=self.jiant_model,
-    #             task=task,
-    #             device=self.device,
-    #             local_rank=self.rparams.local_rank,
-    #             verbose=verbose,
-    #         )
-    #     return evaluate_dict
 
     def get_train_dataloader_dict(self,
                                   for_eval=False,
@@ -427,6 +420,7 @@ def run_val(
     phase=None,
     return_preds=False,
     return_logits=True,
+    return_encoder_output: bool = False,
     verbose=True,
     split='valid',
 ):
@@ -443,6 +437,7 @@ def run_val(
     total_eval_loss = 0
     nb_eval_steps, nb_eval_examples = 0, 0
 
+    encoder_outputs = []
     for step, (batch, batch_metadata) in enumerate(
         maybe_tqdm(val_dataloader, desc=f"Eval ({task.name}, {str(phase)})", verbose=verbose)
     ):
@@ -451,9 +446,14 @@ def run_val(
         batch = batch.to(device)
 
         with torch.no_grad():
-            model_output = wrap_jiant_forward(
-                jiant_model=jiant_model, batch=batch, task=task, compute_loss=has_labels,
+            model_outputs = wrap_jiant_forward(
+                jiant_model=jiant_model, batch=batch, task=task, compute_loss=has_labels, get_encoder_output=return_encoder_output,
             )
+            if return_encoder_output:
+                model_output, encoder_output = model_outputs
+                encoder_outputs.append(encoder_output)
+            else:
+                model_output = model_outputs
         batch_logits = model_output.logits.detach().cpu().numpy()
         if has_labels:
             batch_loss = model_output.loss.mean().item()
@@ -499,7 +499,13 @@ def run_val(
         )
         if isinstance(eval_accumulator, evaluate.ConcatenateLogitsAccumulator) and return_logits:
             output["logits"] = eval_accumulator.get_accumulated()
-
+    if return_encoder_output:
+        output["encoder_outputs_pooled"] = np.concatenate([
+            encoder_output.pooled for encoder_output in encoder_outputs
+        ])
+        output["encoder_outputs_unpooled"] = np.concatenate([
+            encoder_output.unpooled for encoder_output in encoder_outputs
+        ])
     if global_step is not None:
         tf_writer.add_scalar(f'{split}/loss', eval_loss, global_step=global_step)
 
@@ -516,6 +522,7 @@ def run_test(
     verbose=True,
     return_preds=True,
     return_logits=True,
+    return_encoder_output: bool = False,
 ):
     if not local_rank == -1:
         return
@@ -523,6 +530,7 @@ def run_test(
     evaluation_scheme = evaluate.get_evaluation_scheme_for_task(task=task)
     eval_accumulator = evaluation_scheme.get_accumulator()
 
+    encoder_outputs = []
     for step, (batch, batch_metadata) in enumerate(
         maybe_tqdm(test_dataloader, desc=f"Eval ({task.name}, Test)", verbose=verbose)
     ):
@@ -531,9 +539,14 @@ def run_test(
         batch = batch.to(device)
 
         with torch.no_grad():
-            model_output = wrap_jiant_forward(
-                jiant_model=jiant_model, batch=batch, task=task, compute_loss=False,
+            model_outputs = wrap_jiant_forward(
+                jiant_model=jiant_model, batch=batch, task=task, compute_loss=False, get_encoder_output=return_encoder_output,
             )
+            if return_encoder_output:
+                model_output, encoder_output = model_outputs
+                encoder_outputs.append(encoder_output)
+            else:
+                model_output = model_outputs
         batch_logits = model_output.logits.detach().cpu().numpy()
         eval_accumulator.update(
             batch_logits=batch_logits, batch_loss=0, batch=batch, batch_metadata=batch_metadata,
@@ -547,4 +560,11 @@ def run_test(
         )
         if isinstance(eval_accumulator, evaluate.ConcatenateLogitsAccumulator) and return_logits:
             output["logits"] = eval_accumulator.get_accumulated()
+    if return_encoder_output:
+        output["encoder_outputs_pooled"] = np.concatenate([
+            encoder_output.pooled for encoder_output in encoder_outputs
+        ])
+        output["encoder_outputs_unpooled"] = np.concatenate([
+            encoder_output.unpooled for encoder_output in encoder_outputs
+        ])
     return output
