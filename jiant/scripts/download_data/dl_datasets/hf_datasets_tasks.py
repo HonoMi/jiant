@@ -13,6 +13,7 @@ from jiant.tasks.retrieval import (
     QqpTask,
     RteTask,
     SstTask,
+    SciTailTask,
     WnliTask,
     BoolQTask,
     CommitmentBankTask,
@@ -128,7 +129,7 @@ HF_DATASETS_CONVERSION_DICT = {
     },
     "cosmosqa": {"path": "cosmos_qa", "phase_list": ["train", "val", "test"]},
     "socialiqa": {"path": "social_i_qa", "phase_list": ["train", "val"]},
-    "scitail": {"path": "scitail", "name": "tsv_format", "phase_list": ["train", "val", "test"]},
+    "scitail": {"path": "scitail", "name": "tsv_format", "phase_list": ["train", "val", "test"], "label_map": SciTailTask.ID_TO_LABEL},
     "quoref": {"path": "quoref", "phase_list": ["train", "val"]},
     "adversarial_nli_r1": {
         "path": "anli",

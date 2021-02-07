@@ -81,6 +81,7 @@ def create_optimizer(
     optimizer_epsilon=1e-8,
     optimizer_type="adam",
     freeze_encoder=False,
+    freeze_top_layer=False,
     verbose=False,
 ):
 
@@ -96,6 +97,7 @@ def create_optimizer(
         optimizer_epsilon=optimizer_epsilon,
         optimizer_type=optimizer_type,
         freeze_encoder=freeze_encoder,
+        freeze_top_layer=freeze_top_layer,
         verbose=verbose,
     )
 
@@ -112,6 +114,7 @@ def create_optimizer_from_params(
     optimizer_epsilon=1e-8,
     optimizer_type="adam",
     freeze_encoder=False,
+    freeze_top_layer=False,
     verbose=False,
 ):
     all_named_parameters = list(model.named_parameters())
@@ -133,17 +136,31 @@ def create_optimizer_from_params(
 
     optimizer_grouped_parameters = []
 
-    if freeze_encoder:
+    if freeze_encoder or freeze_top_layer:
         logger.info('freeze encoder: the parameters of encoder will not be updated.')
         encoder = list(model.children())[0]
-        encoder_parameter_names = [f'encoder.{name}' for name, _ in encoder.named_parameters()]
-        encoder_parameters = [val for name, val in model.named_parameters()
-                              if name in encoder_parameter_names]
+        model_parameters = model.named_parameters()
+        encoder_parameters = [
+            (f'encoder.{name}', model_parameters[f'encoder.{name}'])
+            for name, _ in encoder.named_parameters()
+        ]
 
-        optimizer_grouped_parameters.append({"params": encoder_parameters, "lr": 0.0})
+        encoder_parameter_names = [name for name, _ in encoder_parameters]
+        top_layer_parameters = [(name, val) for name, val in model.named_parameters()
+                                if name not in encoder_parameter_names]
 
-        named_parameters = [(name, val) for name, val in model.named_parameters()
-                            if name not in encoder_parameter_names]
+        if freeze_encoder:
+            optimizer_grouped_parameters.append({
+                "params": [val for _, val in encoder_parameters],
+                "lr": 0.0
+            })
+            named_parameters = top_layer_parameters
+        else:
+            optimizer_grouped_parameters.append({
+                "params": [val for _, val in top_layer_parameters],
+                "lr": 0.0
+            })
+            named_parameters = encoder_parameters
     else:
         named_parameters = all_named_parameters
 

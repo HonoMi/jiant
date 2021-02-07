@@ -3,6 +3,7 @@ import tarfile
 import urllib
 import zipfile
 
+from datasets import Dataset, DatasetDict, Value, Metric
 import jiant.utils.python.io as py_io
 from jiant.utils.python.datastructures import replace_key
 from datasets_extra.processing import build_cv_splits
@@ -94,6 +95,7 @@ def convert_hf_dataset_to_examples(
             if label_map and "label" in raw_example:
                 # Optionally use an dict or function to map labels
                 label = raw_example["label"]
+
                 if isinstance(label_map, dict):
                     if raw_example["label"] in label_map:
                         label = label_map[raw_example["label"]]
@@ -101,6 +103,7 @@ def convert_hf_dataset_to_examples(
                     label = label_map(raw_example["label"])
                 else:
                     raise TypeError(label_map)
+
                 raw_example["label"] = label
             phase_examples.append(raw_example)
         examples_dict[phase] = phase_examples
@@ -110,8 +113,34 @@ def convert_hf_dataset_to_examples(
                          experiment_id=experiment_id_for_metric,
                          cache_dir=cache_dir_for_metric)
 
+    # label to integer
+    # huggingface-datasetsはたまに，"neutral"などのラベルを持ったデータセットを返す．
+    # これを整数にマップする．
+    inverse_label_map = {}
+    if label_map is None:
+        pass
+    elif isinstance(label_map, dict):
+        inverse_label_map = {val: key for key, val in label_map.items()}
+    else:
+        raise NotImplementedError()
+
+    fold_dataset_with_integer_labels = fold_dataset.copy()
+    for name, dataset in fold_dataset.items():
+        samples = dataset[:].copy()
+        features = dataset.features.copy()
+
+        if 'label' not in samples:
+            continue
+
+        for i in range(0, len(samples['label'])):
+            label = samples['label'][i]
+            samples['label'][i] = inverse_label_map.get(label, label)
+        features['label'] = Value('int64')
+        _dataset = Dataset.from_dict(samples, features=features)
+        fold_dataset_with_integer_labels[name] = _dataset
+
     if return_all:
-        return examples_dict, {'hf_fold_dataset': fold_dataset,
+        return examples_dict, {'hf_fold_dataset': fold_dataset_with_integer_labels,
                                # 'hf_full_dataset': full_dataset,
                                'hf_metric': metric}
     else:
