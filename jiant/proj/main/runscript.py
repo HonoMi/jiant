@@ -207,9 +207,9 @@ def run_loop(args: RunConfiguration, checkpoint=None):
         if args.do_train_eval or args.write_train_preds or args.write_train_encoder_outputs:
             train_eval_results_dict = runner.run_train_eval(
                 task_name_list=runner.jiant_task_container.task_run_config.train_task_list,
-                return_preds=args.write_train_preds,
+                get_preds=args.write_train_preds,
                 global_step=None,
-                return_encoder_output=(True if args.write_train_encoder_outputs else False),
+                get_encoder_output=(True if args.write_train_encoder_outputs else False),
             )
             if args.do_train_eval:
                 jiant_evaluate.write_train_eval_results(
@@ -234,8 +234,8 @@ def run_loop(args: RunConfiguration, checkpoint=None):
         if args.do_val or args.write_val_preds or args.write_val_encoder_outputs:
             val_results_dict = runner.run_val(
                 task_name_list=runner.jiant_task_container.task_run_config.val_task_list,
-                return_preds=args.write_val_preds,
-                return_encoder_output=(True if args.write_val_encoder_outputs else False),
+                get_preds=args.write_val_preds,
+                get_encoder_output=(True if args.write_val_encoder_outputs else False),
             )
             if args.do_val:
                 jiant_evaluate.write_val_results(
@@ -260,8 +260,8 @@ def run_loop(args: RunConfiguration, checkpoint=None):
         if args.do_test or args.write_test_preds or args.write_test_encoder_outputs:
             test_results_dict = runner.run_test(
                 task_name_list=runner.jiant_task_container.task_run_config.test_task_list,
-                return_preds=args.write_test_preds,
-                return_encoder_output=(True if args.write_test_encoder_outputs else False),
+                get_preds=args.write_test_preds,
+                get_encoder_output=(True if args.write_test_encoder_outputs else False),
             )
             if args.do_test:
                 jiant_evaluate.write_test_results(

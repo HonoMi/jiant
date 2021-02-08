@@ -1,6 +1,7 @@
 import transformers
 import torch
 import logging
+from typing import Dict
 
 from jiant.ext.radam import RAdam
 from jiant.shared.model_resolution import ModelArchitectures, resolve_tokenizer_class
@@ -47,34 +48,34 @@ def get_tokenizer(model_type, tokenizer_path):
 
 
 class OptimizerScheduler:
-    def __init__(self, optimizers, schedulers):
+    def __init__(self, optimizers: Dict, schedulers: Dict):
         super().__init__()
         self.optimizers = optimizers
         self.schedulers = schedulers
 
     def step(self):
-        for optimizer in self.optimizers:
+        for optimizer in self.optimizers.values():
             optimizer.step()
-        for scheduler in self.schedulers:
+        for scheduler in self.schedulers.values():
             scheduler.step()
 
     def state_dict(self):
         return {
-            "optimizers": [
-                optimizer.state_dict()
-                for optimizer in self.optimizers
-            ],
-            "schedulers": [
-                scheduler.state_dict()
-                for scheduler in self.schedulers
-            ],
+            "optimizers": {
+                name: optimizer.state_dict()
+                for name, optimizer in self.optimizers.items()
+            },
+            "schedulers": {
+                name: scheduler.state_dict()
+                for name, scheduler in self.schedulers.items()
+            },
         }
 
     def load_state_dict(self, state_dict, strict=True):
-        for optimizer, state_dict in zip(self.optimizers, state_dict['optimizer']):
-            optimizer.load_state_dict(state_dict, strict=strict)
-        for scheduler, state_dict in zip(self.schedulers, state_dict['scheduler']):
-            scheduler.load_state_dict(state_dict, strict=strict)
+        for name, optimizer in self.optimizers.items():
+            optimizer.load_state_dict(state_dict['optimizers'][name], strict=strict)
+        for name, scheduler in self.schedulers.items():
+            scheduler.load_state_dict(state_dict['schedulers'][name], strict=strict)
         # self.optimizer.load_state_dict(state_dict["optimizer"], strict=strict)
 
 
@@ -159,13 +160,15 @@ def create_optimizer_from_params(
 
     # Group parameters
     encoder = list(model.children())[0]
-    model_parameters = model.named_parameters()
-    encoder_parameters = [
-        (f'encoder.{name}', model_parameters[f'encoder.{name}'])
-        for name, _ in encoder.named_parameters()
-    ]
+    encoder_parameter_names = [f'encoder.{name}' for name, _ in encoder.named_parameters()]
+    # encoder_parameters = [
+    #     (f'encoder.{name}', model_parameters[f'encoder.{name}'])
+    #     for name, _ in encoder.named_parameters()
+    # ]
+    encoder_parameters = [(f'encoder.{name}', val) for name, val in model.named_parameters()
+                          if name in encoder_parameter_names]
 
-    encoder_parameter_names = [name for name, _ in encoder_parameters]
+    # encoder_parameter_names = [name for name, _ in encoder_parameters]
     top_layer_parameters = [(name, val) for name, val in model.named_parameters()
                             if name not in encoder_parameter_names]
 
@@ -230,10 +233,8 @@ def create_optimizer_from_params(
         second_warmup_steps = resolve_warmup_steps(
             t_total=t2_total, warmup_steps=rewarmup_steps, warmup_proportion=rewarmup_proportion,
         )
-        if freeze_encoder_when_rewarmup:
-            encoder_second_annealing_lr_scale = 0.0
-        if freeze_top_layer_when_rewarmup:
-            top_layer_second_annealing_lr_scale = 0.0
+        encoder_second_annealing_lr_scale = 0.0 if freeze_encoder_when_rewarmup else 1.0
+        top_layer_second_annealing_lr_scale = 0.0 if freeze_top_layer_when_rewarmup else 1.0
 
         encoder_scheduler = get_linear_schedule_with_warmup_and_rewarmup(
             encoder_optimizer, warmup_steps, t_total, second_warmup_steps, t2_total,
@@ -252,8 +253,14 @@ def create_optimizer_from_params(
         )
 
     optimizer_scheduler = OptimizerScheduler(
-        optimizers=[encoder_optimizer, top_layer_optimizer],
-        schedulers=[encoder_scheduler, top_layer_scheduler],
+        optimizers={
+            'encoder': encoder_optimizer,
+            'top_layer': top_layer_optimizer
+        },
+        schedulers={
+            'encoder': encoder_scheduler,
+            'top_layer': top_layer_scheduler
+        },
     )
     return optimizer_scheduler
 

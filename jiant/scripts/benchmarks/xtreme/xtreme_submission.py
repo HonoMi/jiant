@@ -263,7 +263,7 @@ def generate_and_write_preds_for_qa(
                 task=runner.jiant_task_container.task_dict[task_name],
                 device=runner.device,
                 local_rank=runner.rparams.local_rank,
-                return_preds=False,
+                get_preds=False,
                 verbose=True,
             )
     else:
@@ -338,7 +338,7 @@ def generate_and_write_preds_for_bucc2018(
         # Recompute thresholds:
         val_results_dict = runner.run_val(
             task_name_list=runner.jiant_task_container.task_run_config.val_task_list,
-            return_preds=True,
+            get_preds=True,
         )
         jiant_evaluate.write_preds(
             eval_results_dict=val_results_dict,
@@ -381,7 +381,7 @@ def generate_and_write_preds_for_tatoeba(runner, output_dir: str, skip_if_done: 
         logger.info(f"Skipping cause {preds_pickle_path} exists")
         return
     val_results_dict = runner.run_val(
-        task_name_list=runner.jiant_task_container.task_run_config.val_task_list, return_preds=True,
+        task_name_list=runner.jiant_task_container.task_run_config.val_task_list, get_preds=True,
     )
     jiant_evaluate.write_preds(
         eval_results_dict=val_results_dict, path=preds_pickle_path,

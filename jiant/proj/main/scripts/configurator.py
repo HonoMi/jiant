@@ -41,6 +41,55 @@ def cap_examples(num_examples, cap):
         return min(num_examples, cap)
 
 
+def resolve_steps(self,
+                  steps_per_epoch,
+                  max_steps):
+    if self.train_sample_weights is not None and self.train_loss_weights is not None:
+        raise NotImplementedError()
+
+    if self.train_sample_weights is not None:
+        if self.weighted_sampling_start_epoch is not None and self.weighted_sampling_start_step is not None:
+            raise ValueError('Only one of "weighted-sampling-start-epoch" or "weighted-sampling-start-step" can be specified.')
+        if self.weighted_sampling_start_epoch is not None:
+            self.weighted_sampling_start_step = self.weighted_sampling_start_epoch * steps_per_epoch
+        elif self.weighted_sampling_start_step is not None:
+            self.weighted_sampling_start_epoch = self.weighted_sampling_start_step / float(steps_per_epoch)
+        else:
+            self.weighted_sampling_start_epoch = 0
+            self.weighted_sampling_start_step = 0
+        if max_steps < self.weighted_sampling_start_step:
+            raise ValueError()
+    elif self.train_loss_weights is not None:
+        if self.weighted_loss_start_epoch is not None and self.weighted_loss_start_step is not None:
+            raise ValueError('Only one of "weighted-loss-start-epoch" or "weighted-loss-start-step" can be specified.')
+        if self.weighted_loss_start_epoch is not None:
+            self.weighted_loss_start_step = self.weighted_loss_start_epoch * steps_per_epoch
+        elif self.weighted_loss_start_step is not None:
+            self.weighted_loss_start_epoch = self.weighted_loss_start_step / float(steps_per_epoch)
+        else:
+            self.weighted_loss_start_epoch = 0
+            self.weighted_loss_start_step = 0
+        if max_steps < self.weighted_loss_start_step:
+            raise ValueError()
+    else:
+        self.weighted_sampling_start_step = max_steps + 1
+
+
+    second_stage_start_steps = self.weighted_sampling_start_step or self.weighted_loss_start_step or max_steps + 1
+
+    first_stage_steps = second_stage_start_steps
+    warmup_steps = first_stage_steps * self.warmup_steps_proportion
+
+    second_stage_steps = max_steps - first_stage_steps
+    if self.no_rewarmup_in_second_stage:
+        rewarmup_steps = 0
+    else:
+        rewarmup_steps = second_stage_steps * self.rewarmup_steps_proportion
+
+    return first_stage_steps, second_stage_start_steps, warmup_steps, rewarmup_steps
+
+
+
 @Registry.register
 @zconf.run_config
 class SingleTaskConfigurator(zconf.RunConfig):
@@ -95,17 +144,17 @@ class SingleTaskConfigurator(zconf.RunConfig):
     eval_subset_num = zconf.attr(type=int, default=500)
     train_sample_weights = zconf.attr(type=str, default=None)
     train_loss_weights = zconf.attr(type=str, default=None)
-    weighted_sampling_start_step = zconf.attr(type=int, default=0)  # zero start
-    weighted_sampling_start_epoch = zconf.attr(type=int, default=0)  # zero start
-    weighted_loss_start_step = zconf.attr(type=int, default=0)  # zero start
-    weighted_loss_start_epoch = zconf.attr(type=int, default=0)  # zero start
+    weighted_sampling_start_step = zconf.attr(type=int, default=None)  # zero start
+    weighted_sampling_start_epoch = zconf.attr(type=int, default=None)  # zero start
+    weighted_loss_start_step = zconf.attr(type=int, default=None)  # zero start
+    weighted_loss_start_epoch = zconf.attr(type=int, default=None)  # zero start
     no_rewarmup_in_second_stage = zconf.attr(action="store_true")
+    warmup_steps_proportion = zconf.attr(type=float, default=0.1)
+    rewarmup_steps_proportion = zconf.attr(type=float, default=0.1)
     fix_seed_for_weighted_sampler = zconf.attr(action="store_true")
     epochs = zconf.attr(type=int, default=None)
     max_steps = zconf.attr(type=int, default=None)
     num_gpus = zconf.attr(type=int, default=None)
-    warmup_steps_proportion = zconf.attr(type=float, default=0.1)
-    rewarmup_steps_proportion = zconf.attr(type=float, default=0.1)
 
     def create_config(self):
         # === Get task config === #
@@ -168,18 +217,10 @@ class SingleTaskConfigurator(zconf.RunConfig):
         else:
             raise RuntimeError("Require either `epochs` or `max_steps`")
 
-        if self.weighted_sampling_start_epoch != 0:
-            if self.weighted_sampling_start_step != 0:
-                raise ValueError('Only one of "weighted-sampling-start-epoch" or "weighted-sampling-start-step" can be specified.')
-            self.weighted_sampling_start_step = self.weighted_sampling_start_epoch * steps_per_epoch
-        if self.weighted_loss_start_epoch != 0:
-            if self.weighted_loss_start_step != 0:
-                raise ValueError('Only one of "weighted-loss-start-epoch" or "weighted-loss-start-step" can be specified.')
-            self.weighted_loss_start_step = self.weighted_loss_start_epoch * steps_per_epoch
-        if self.train_sample_weights is None:
-            self.weighted_sampling_start_step = 0
-        if self.train_loss_weights is None:
-            self.weighted_loss_start_step = 0
+        (first_stage_steps,
+         second_stage_steps,
+         warmup_steps,
+         rewarmup_steps) = resolve_steps(self, steps_per_epoch, max_steps)
 
         # === Compute eval_batch_size === #
         if self.eval_batch_size is not None:
@@ -190,20 +231,6 @@ class SingleTaskConfigurator(zconf.RunConfig):
             eval_batch_size = self.train_batch_size * self.eval_batch_multiplier
         else:
             raise RuntimeError("Require either `eval_batch_size` or `eval_batch_multiplier`")
-
-        if self.weighted_sampling_start_step != 0 and self.weighted_loss_start_epoch != 0:
-            raise NotImplementedError()
-        else:
-            second_stage_start_steps = self.weighted_sampling_start_step or self.weighted_loss_start_step
-
-            first_stage_steps = second_stage_start_steps
-            warmup_steps = first_stage_steps * self.warmup_steps_proportion
-
-            second_stage_steps = max_steps - first_stage_steps
-            if self.no_rewarmup_in_second_stage:
-                rewarmup_steps = 0
-            else:
-                rewarmup_steps = second_stage_steps * self.rewarmup_steps_proportion
 
         # === Build configuration === #
         # Finally, we build our big config dictionary. Congrats!
@@ -307,10 +334,10 @@ class SimpleAPIMultiTaskConfigurator(zconf.RunConfig):
     eval_subset_num = zconf.attr(type=int, default=500)
     train_sample_weights = zconf.attr(type=str, default=None)
     train_loss_weights = zconf.attr(type=str, default=None)
-    weighted_sampling_start_step = zconf.attr(type=int, default=0)
-    weighted_sampling_start_epoch = zconf.attr(type=int, default=1)
-    weighted_loss_start_step = zconf.attr(type=int, default=0)
-    weighted_loss_start_epoch = zconf.attr(type=int, default=1)
+    weighted_sampling_start_step = zconf.attr(type=int, default=None)
+    weighted_sampling_start_epoch = zconf.attr(type=int, default=None)
+    weighted_loss_start_step = zconf.attr(type=int, default=None)
+    weighted_loss_start_epoch = zconf.attr(type=int, default=None)
     no_rewarmup_in_second_stage = zconf.attr(action="store_true")
     fix_seed_for_weighted_sampler = zconf.attr(action="store_true")
     epochs = zconf.attr(type=int, default=None)
@@ -452,18 +479,10 @@ class SimpleAPIMultiTaskConfigurator(zconf.RunConfig):
         if max_steps_not_given:
             max_steps += self.epochs * steps_per_epoch
 
-        if self.weighted_sampling_start_epoch != 0:
-            if self.weighted_sampling_start_step != 0:
-                raise ValueError('Only one of "weighted-sampling-start-epoch" or "weighted-sampling-start-step" can be specified.')
-            self.weighted_sampling_start_step = self.weighted_sampling_start_epoch * steps_per_epoch
-        if self.weighted_loss_start_epoch != 0:
-            if self.weighted_loss_start_step != 0:
-                raise ValueError('Only one of "weighted-loss-start-epoch" or "weighted-loss-start-step" can be specified.')
-            self.weighted_loss_start_step = self.weighted_loss_start_epoch * steps_per_epoch
-        if self.train_sample_weights is None:
-            self.weighted_sampling_start_step = 0
-        if self.train_loss_weights is None:
-            self.weighted_loss_start_step = 0
+        (first_stage_steps,
+         second_stage_steps,
+         warmup_steps,
+         rewarmup_steps) = resolve_steps(self, steps_per_epoch, max_steps)
 
         # === Compute eval_batch_size === #
         # Eval batch size is often a multiple of train batch size,
@@ -488,21 +507,6 @@ class SimpleAPIMultiTaskConfigurator(zconf.RunConfig):
                 "task_to_unweighted_probs": capped_num_examples_dict,
             }
 
-        if self.weighted_sampling_start_step != 0 and self.weighted_loss_start_epoch != 0:
-            raise NotImplementedError()
-        else:
-            second_stage_start_steps = self.weighted_sampling_start_step or self.weighted_loss_start_step
-
-            first_stage_steps = second_stage_start_steps
-            warmup_steps = first_stage_steps * self.warmup_steps_proportion
-
-            second_stage_steps = max_steps - first_stage_steps
-            if self.no_rewarmup_in_second_stage:
-                rewarmup_steps = 0
-            else:
-                rewarmup_steps = second_stage_steps * self.rewarmup_steps_proportion
-
-        # === Build configuration === #
         # Finally, we build our big config dictionary. Congrats!
         config_dict = {
             "task_config_path_dict": task_config_path_dict,
