@@ -72,6 +72,9 @@ class RunConfiguration(zconf.RunConfig):
     max_grad_norm = zconf.attr(default=1.0, type=float)
     optimizer_type = zconf.attr(default="adam", type=str)
     freeze_encoder = zconf.attr(default=False, type=bool, action="store_true")
+    freeze_encoder_when_rewarmup = zconf.attr(default=False, type=bool, action="store_true")
+    freeze_top_layer = zconf.attr(default=False, type=bool, action="store_true")
+    freeze_top_layer_when_rewarmup = zconf.attr(default=False, type=bool, action="store_true")
     seed = zconf.attr(type=int, default=-1)
 
 
@@ -128,17 +131,20 @@ def setup_runner(
 
         optimizer_type=args.optimizer_type,
         freeze_encoder=args.freeze_encoder,
+        freeze_encoder_when_rewarmup=args.freeze_encoder_when_rewarmup,
+        freeze_top_layer=args.freeze_top_layer,
+        freeze_top_layer_when_rewarmup=args.freeze_top_layer_when_rewarmup,
         verbose=verbose,
     )
-    jiant_model, optimizer = model_setup.raw_special_model_setup(
+    jiant_model, optimizers = model_setup.raw_special_model_setup(
         model=jiant_model,
-        optimizer=optimizer_scheduler.optimizer,
+        optimizers=optimizer_scheduler.optimizers,
         fp16=args.fp16,
         fp16_opt_level=args.fp16_opt_level,
         n_gpu=quick_init_out.n_gpu,
         local_rank=args.local_rank,
     )
-    optimizer_scheduler.optimizer = optimizer
+    optimizer_scheduler.optimizers = optimizers
     rparams = jiant_runner.RunnerParameters(
         local_rank=args.local_rank,
         n_gpu=quick_init_out.n_gpu,

@@ -29,7 +29,7 @@ class _ListDataset(Dataset):
 
 
 def complex_backpropagate(
-    loss, optimizer, model, fp16, n_gpu, gradient_accumulation_steps, max_grad_norm
+    loss, optimizers, model, fp16, n_gpu, gradient_accumulation_steps, max_grad_norm
 ):
     if n_gpu > 1:
         loss = loss.mean()  # mean() to average on multi-gpu.
@@ -39,9 +39,10 @@ def complex_backpropagate(
         # noinspection PyUnresolvedReferences,PyPackageRequirements
         from apex import amp
 
-        with amp.scale_loss(loss, optimizer) as scaled_loss:
+        with amp.scale_loss(loss, optimizers=optimizers) as scaled_loss:
             scaled_loss.backward()
-        torch.nn.utils.clip_grad_norm_(amp.master_params(optimizer), max_grad_norm)
+        for optimizer in optimizers:
+            torch.nn.utils.clip_grad_norm_(amp.master_params(optimizer), max_grad_norm)
     else:
         loss.backward()
         torch.nn.utils.clip_grad_norm_(model.parameters(), max_grad_norm)

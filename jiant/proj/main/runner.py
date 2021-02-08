@@ -186,7 +186,8 @@ class JiantRunner:
             loss_val += loss.item()
 
         self.optimizer_scheduler.step()
-        self.optimizer_scheduler.optimizer.zero_grad()
+        for optimizer in self.optimizer_scheduler.optimizers:
+            optimizer.zero_grad()
 
         train_state.step(task_name=task_name)
         loss_per_step = loss_val / task_specific_config.gradient_accumulation_steps
@@ -199,8 +200,9 @@ class JiantRunner:
                 "loss_val": loss_per_step,
             },
         )
-        for i_group, param_group in enumerate(self.optimizer_scheduler.optimizer.param_groups):
-            self.tf_writer.add_scalar(f'params-{i_group}/lrate', param_group['lr'], global_step=train_state.global_steps)
+        for optimizer in self.optimizer_scheduler.optimizers:
+            for i_group, param_group in enumerate(optimizer.param_groups):
+                self.tf_writer.add_scalar(f'params-{i_group}/lrate', param_group['lr'], global_step=train_state.global_steps)
         self.tf_writer.add_scalar(f'{task_name}/train-loss', loss_per_step, global_step=train_state.global_steps)
         return loss_per_step
 
@@ -373,7 +375,7 @@ class JiantRunner:
     def complex_backpropagate(self, loss, gradient_accumulation_steps):
         return complex_backpropagate(
             loss=loss,
-            optimizer=self.optimizer_scheduler.optimizer,
+            optimizers=self.optimizer_scheduler.optimizers,
             model=self.jiant_model,
             fp16=self.rparams.fp16,
             n_gpu=self.rparams.n_gpu,
@@ -385,13 +387,14 @@ class JiantRunner:
         # TODO: Add fp16  (issue #1186)
         state = {
             "model": torch_utils.get_model_for_saving(self.jiant_model).state_dict(),
-            "optimizer": self.optimizer_scheduler.optimizer.state_dict(),
+            "optimizers": [optimizer.state_dict() for optimizer in self.optimizer_scheduler.optimizers],
         }
         return state
 
     def load_state(self, runner_state):
         torch_utils.get_model_for_saving(self.jiant_model).load_state_dict(runner_state["model"])
-        self.optimizer_scheduler.optimizer.load_state_dict(runner_state["optimizer"])
+        for optimizer, state_dict in zip(self.optimizer_scheduler.optimizers, runner_state["optimizers"]):
+            optimizer.load_state_dict(state_dict)
 
 
 class CheckpointSaver:

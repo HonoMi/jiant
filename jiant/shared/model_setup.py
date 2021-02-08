@@ -47,24 +47,35 @@ def get_tokenizer(model_type, tokenizer_path):
 
 
 class OptimizerScheduler:
-    def __init__(self, optimizer, scheduler):
+    def __init__(self, optimizers, schedulers):
         super().__init__()
-        self.optimizer = optimizer
-        self.scheduler = scheduler
+        self.optimizers = optimizers
+        self.schedulers = schedulers
 
     def step(self):
-        self.optimizer.step()
-        self.scheduler.step()
+        for optimizer in self.optimizers:
+            optimizer.step()
+        for scheduler in self.schedulers:
+            scheduler.step()
 
     def state_dict(self):
         return {
-            "optimizer": self.optimizer.state_dict(),
-            "scheduler": self.scheduler.state_dict(),
+            "optimizers": [
+                optimizer.state_dict()
+                for optimizer in self.optimizers
+            ],
+            "schedulers": [
+                scheduler.state_dict()
+                for scheduler in self.schedulers
+            ],
         }
 
     def load_state_dict(self, state_dict, strict=True):
-        self.optimizer.load_state_dict(state_dict["optimizer"], strict=strict)
-        self.scheduler.load_state_dict(state_dict["scheduler"], strict=strict)
+        for optimizer, state_dict in zip(self.optimizers, state_dict['optimizer']):
+            optimizer.load_state_dict(state_dict, strict=strict)
+        for scheduler, state_dict in zip(self.schedulers, state_dict['scheduler']):
+            scheduler.load_state_dict(state_dict, strict=strict)
+        # self.optimizer.load_state_dict(state_dict["optimizer"], strict=strict)
 
 
 def create_optimizer(
@@ -81,7 +92,9 @@ def create_optimizer(
     optimizer_epsilon=1e-8,
     optimizer_type="adam",
     freeze_encoder=False,
+    freeze_encoder_when_rewarmup=False,
     freeze_top_layer=False,
+    freeze_top_layer_when_rewarmup=False,
     verbose=False,
 ):
 
@@ -97,7 +110,9 @@ def create_optimizer(
         optimizer_epsilon=optimizer_epsilon,
         optimizer_type=optimizer_type,
         freeze_encoder=freeze_encoder,
+        freeze_encoder_when_rewarmup=freeze_encoder_when_rewarmup,
         freeze_top_layer=freeze_top_layer,
+        freeze_top_layer_when_rewarmup=freeze_top_layer_when_rewarmup,
         verbose=verbose,
     )
 
@@ -114,9 +129,17 @@ def create_optimizer_from_params(
     optimizer_epsilon=1e-8,
     optimizer_type="adam",
     freeze_encoder=False,
+    freeze_encoder_when_rewarmup=False,
     freeze_top_layer=False,
+    freeze_top_layer_when_rewarmup=False,
     verbose=False,
 ):
+    if freeze_encoder and freeze_encoder_when_rewarmup:
+        raise ValueError()
+    if freeze_top_layer and freeze_top_layer_when_rewarmup:
+        raise ValueError()
+
+    # Check
     all_named_parameters = list(model.named_parameters())
     # import pudb; pudb.set_trace()
     # Prepare optimizer
@@ -134,88 +157,104 @@ def create_optimizer_from_params(
             if any(nd in n for nd in no_decay):
                 logger.info(f"  {n}")
 
-    optimizer_grouped_parameters = []
+    # Group parameters
+    encoder = list(model.children())[0]
+    model_parameters = model.named_parameters()
+    encoder_parameters = [
+        (f'encoder.{name}', model_parameters[f'encoder.{name}'])
+        for name, _ in encoder.named_parameters()
+    ]
 
-    if freeze_encoder or freeze_top_layer:
-        logger.info('freeze encoder: the parameters of encoder will not be updated.')
-        encoder = list(model.children())[0]
-        model_parameters = model.named_parameters()
-        encoder_parameters = [
-            (f'encoder.{name}', model_parameters[f'encoder.{name}'])
-            for name, _ in encoder.named_parameters()
+    encoder_parameter_names = [name for name, _ in encoder_parameters]
+    top_layer_parameters = [(name, val) for name, val in model.named_parameters()
+                            if name not in encoder_parameter_names]
+
+    encoder_optimizer_grouped_parameters = []
+    top_layer_optimizer_grouped_parameters = []
+
+    for optimizer_grouped_parameters, named_parameters in [(encoder_optimizer_grouped_parameters, encoder_parameters),
+                                                           (top_layer_optimizer_grouped_parameters, top_layer_parameters)]:
+
+        used_named_parameters = [
+            (n, p) for n, p in named_parameters if p.requires_grad and "weighted_sum.weights" not in n
         ]
+        weighted_sum_params = [
+            (n, p) for n, p in named_parameters if p.requires_grad and "weighted_sum.weights" in n
+        ]
+        optimizer_grouped_parameters.extend([
+            {
+                "params": [p for n, p in used_named_parameters if not any(n.find(nd) >= 0 for nd in no_decay)],
+                "weight_decay": 0.01,
+            },
+            {
+                "params": [p for n, p in used_named_parameters if any(n.find(nd) >= 0 for nd in no_decay)],
+                "weight_decay": 0.0,
+            },
+            {
+                "params": [p for n, p in weighted_sum_params],
+                "weight_decay": 0.0,
+                "lr": 0.01
+            },
+        ])
 
-        encoder_parameter_names = [name for name, _ in encoder_parameters]
-        top_layer_parameters = [(name, val) for name, val in model.named_parameters()
-                                if name not in encoder_parameter_names]
-
-        if freeze_encoder:
-            optimizer_grouped_parameters.append({
-                "params": [val for _, val in encoder_parameters],
-                "lr": 0.0
-            })
-            named_parameters = top_layer_parameters
-        else:
-            optimizer_grouped_parameters.append({
-                "params": [val for _, val in top_layer_parameters],
-                "lr": 0.0
-            })
-            named_parameters = encoder_parameters
-    else:
-        named_parameters = all_named_parameters
-
-    used_named_parameters = [
-        (n, p) for n, p in named_parameters if p.requires_grad and "weighted_sum.weights" not in n
-    ]
-    weighted_sum_params = [
-        (n, p) for n, p in named_parameters if p.requires_grad and "weighted_sum.weights" in n
-    ]
-
-    optimizer_grouped_parameters.extend([
-        {
-            "params": [p for n, p in used_named_parameters if not any(nd in n for nd in no_decay)],
-            "weight_decay": 0.01,
-        },
-        {
-            "params": [p for n, p in used_named_parameters if any(nd in n for nd in no_decay)],
-            "weight_decay": 0.0,
-        },
-        {"params": [p for n, p in weighted_sum_params], "weight_decay": 0.0, "lr": 0.01},
-    ])
+    # Optimizer
+    encoder_lr = learning_rate
+    top_layer_lr = learning_rate
+    if freeze_encoder:
+        encoder_lr = 0.0
+    if freeze_top_layer:
+        top_layer_lr = 0.0
 
     if optimizer_type == "adam":
         if verbose:
             logger.info("Using AdamW")
-        optimizer = transformers.AdamW(
-            optimizer_grouped_parameters, lr=learning_rate, eps=optimizer_epsilon
+        encoder_optimizer = transformers.AdamW(
+            encoder_optimizer_grouped_parameters, lr=encoder_lr, eps=optimizer_epsilon
+        )
+        top_layer_optimizer = transformers.AdamW(
+            top_layer_optimizer_grouped_parameters, lr=top_layer_lr, eps=optimizer_epsilon
         )
     elif optimizer_type == "radam":
         if verbose:
             logger.info("Using RAdam")
-        optimizer = RAdam(optimizer_grouped_parameters, lr=learning_rate, eps=optimizer_epsilon)
+        encoder_optimizer = RAdam(encoder_optimizer_grouped_parameters, lr=encoder_lr, eps=optimizer_epsilon)
+        top_layer_optimizer = RAdam(top_layer_optimizer_grouped_parameters, lr=top_layer_lr, eps=optimizer_epsilon)
     else:
         raise KeyError(optimizer_type)
 
+    # Scheduler
     warmup_steps = resolve_warmup_steps(
         t_total=t_total, warmup_steps=warmup_steps, warmup_proportion=warmup_proportion,
     )
     if any([t2_total is not None, rewarmup_steps is not None, rewarmup_proportion is not None]):
-        # first_annealing_warmup_steps,
-        # first_annealing_total_steps,
-        # second_annealing_warmup_steps,
-        # second_annealing_total_steps,
         second_warmup_steps = resolve_warmup_steps(
             t_total=t2_total, warmup_steps=rewarmup_steps, warmup_proportion=rewarmup_proportion,
         )
+        if freeze_encoder_when_rewarmup:
+            encoder_second_annealing_lr_scale = 0.0
+        if freeze_top_layer_when_rewarmup:
+            top_layer_second_annealing_lr_scale = 0.0
 
-        scheduler = get_linear_schedule_with_warmup_and_rewarmup(
-            optimizer, warmup_steps, t_total, second_warmup_steps, t2_total
+        encoder_scheduler = get_linear_schedule_with_warmup_and_rewarmup(
+            encoder_optimizer, warmup_steps, t_total, second_warmup_steps, t2_total,
+            second_annealing_lr_scale=encoder_second_annealing_lr_scale,
+        )
+        top_layer_scheduler = get_linear_schedule_with_warmup_and_rewarmup(
+            top_layer_optimizer, warmup_steps, t_total, second_warmup_steps, t2_total,
+            second_annealing_lr_scale=top_layer_second_annealing_lr_scale,
         )
     else:
-        scheduler = transformers.get_linear_schedule_with_warmup(
-            optimizer, num_warmup_steps=warmup_steps, num_training_steps=t_total
+        encoder_scheduler = transformers.get_linear_schedule_with_warmup(
+            encoder_optimizer, num_warmup_steps=warmup_steps, num_training_steps=t_total
         )
-    optimizer_scheduler = OptimizerScheduler(optimizer=optimizer, scheduler=scheduler)
+        top_layer_scheduler = transformers.get_linear_schedule_with_warmup(
+            top_layer_optimizer, num_warmup_steps=warmup_steps, num_training_steps=t_total
+        )
+
+    optimizer_scheduler = OptimizerScheduler(
+        optimizers=[encoder_optimizer, top_layer_optimizer],
+        schedulers=[encoder_scheduler, top_layer_scheduler],
+    )
     return optimizer_scheduler
 
 
@@ -232,7 +271,7 @@ def resolve_warmup_steps(t_total, warmup_steps, warmup_proportion):
         raise RuntimeError()
 
 
-def fp16ize(model, optimizer, fp16_opt_level):
+def fp16ize(model, optimizers, fp16_opt_level):
     try:
         # noinspection PyUnresolvedReferences,PyPackageRequirements
         from apex import amp
@@ -240,8 +279,8 @@ def fp16ize(model, optimizer, fp16_opt_level):
         raise ImportError(
             "Please install apex from https://www.github.com/nvidia/apex to use fp16 training."
         )
-    model, optimizer = amp.initialize(model, optimizer, opt_level=fp16_opt_level)
-    return model, optimizer
+    model, optimizers = amp.initialize(model, optimizers=optimizers, opt_level=fp16_opt_level)
+    return model, optimizers
 
 
 def parallelize_gpu(model):
@@ -254,12 +293,12 @@ def parallelize_dist(model, local_rank):
     )
 
 
-def raw_special_model_setup(model, optimizer, fp16, fp16_opt_level, n_gpu, local_rank):
+def raw_special_model_setup(model, optimizers, fp16, fp16_opt_level, n_gpu, local_rank):
     """Perform setup for special modes (e.g., FP16, DataParallel, and/or DistributedDataParallel.
 
     Args:
         model (nn.Module): torch model object.
-        optimizer: TODO
+        optimizers: TODO
         fp16 (bool): True to enable FP16 mode.
         fp16_opt_level (str): Apex AMP optimization level default mode identifier.
         n_gpu: number of GPUs.
@@ -269,28 +308,28 @@ def raw_special_model_setup(model, optimizer, fp16, fp16_opt_level, n_gpu, local
         Initialization steps performed in init_cuda_from_args() set n_gpu = 1 when local_rank != -1.
 
     Returns:
-        Model and optimizer with the specified special configuration.
+        Model and optimizers with the specified special configuration.
 
     """
     if fp16:
-        model, optimizer = fp16ize(model=model, optimizer=optimizer, fp16_opt_level=fp16_opt_level)
+        model, optimizers = fp16ize(model=model, optimizers=optimizers, fp16_opt_level=fp16_opt_level)
     if n_gpu > 1:
         model = parallelize_gpu(model=model)
     if local_rank != -1:
         model = parallelize_dist(model=model, local_rank=local_rank)
-    return model, optimizer
+    return model, optimizers
 
 
 def special_model_setup(
     model_wrapper, optimizer_scheduler, fp16, fp16_opt_level, n_gpu, local_rank
 ):
-    model, optimizer = raw_special_model_setup(
+    model, optimizers = raw_special_model_setup(
         model=model_wrapper.model,
-        optimizer=optimizer_scheduler.optimizer,
+        optimizers=optimizer_scheduler.optimizers,
         fp16=fp16,
         fp16_opt_level=fp16_opt_level,
         n_gpu=n_gpu,
         local_rank=local_rank,
     )
     model_wrapper.model = model
-    optimizer_scheduler.optimizer = optimizer
+    optimizer_scheduler.optimizers = optimizers
