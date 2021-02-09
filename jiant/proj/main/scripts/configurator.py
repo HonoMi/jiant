@@ -444,9 +444,13 @@ class SimpleAPIMultiTaskConfigurator(zconf.RunConfig):
         # We need to get the number of examples for each task, divide by the
         # effective batch size (batch size per gpu * grad accum steps * number of gpus)
         # AND consider a common use-case where we cap the number of examples from a given task
-        assert (self.epochs is None) != (
-            self.max_steps is None
-        ), "Specify only 'epochs' or 'max_steps'"
+        if self.epochs is None and self.max_steps is None:
+            raise ValueError('Specify either "epochs" or "max_steps"')
+        if self.epochs is not None and self.max_steps is not None:
+            raise ValueError('Specify only "epochs" or "max_steps"')
+        # assert (self.epochs is None) != (
+        #     self.max_steps is None
+        # ), "Specify only 'epochs' or 'max_steps'"
         num_examples_dict = {}
         capped_num_examples_dict = {}
         max_steps_not_given = self.max_steps is None

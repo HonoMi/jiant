@@ -1,6 +1,6 @@
 import abc
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Optional, Tuple
 
 import torch
 import torch.nn as nn
@@ -27,7 +27,9 @@ class ClassificationModel(Taskmodel):
         self.classification_head = classification_head
 
     def forward(self, batch, task, tokenizer, compute_loss: bool = False, loss_weights: torch.Tensor = None, get_encoder_output: bool = False):
-        encoder_output = get_output_from_encoder_and_batch(encoder=self.encoder, batch=batch)
+        encoder_output = get_output_from_encoder_and_batch(encoder=self.encoder,
+                                                           batch=batch,
+                                                           get_hidden_states=get_encoder_output)
         logits = self.classification_head(pooled=encoder_output.pooled)
         if compute_loss:
             if loss_weights is not None:
@@ -44,7 +46,11 @@ class ClassificationModel(Taskmodel):
             results = LogitsAndLossOutput(logits=logits, loss=loss, other=encoder_output.other)
         else:
             results = LogitsOutput(logits=logits, other=encoder_output.other)
-        return (results, StaticEncoderOutput(encoder_output)) if get_encoder_output else results
+
+        if get_encoder_output:
+            return results, StaticEncoderOutput(encoder_output)
+        else:
+            return results
 
 
 class RegressionModel(Taskmodel):
@@ -53,7 +59,9 @@ class RegressionModel(Taskmodel):
         self.regression_head = regression_head
 
     def forward(self, batch, task, tokenizer, compute_loss: bool = False, loss_weights: torch.Tensor = None, get_encoder_output: bool = False):
-        encoder_output = get_output_from_encoder_and_batch(encoder=self.encoder, batch=batch)
+        encoder_output = get_output_from_encoder_and_batch(encoder=self.encoder,
+                                                           batch=batch,
+                                                           get_hidden_states=get_encoder_output)
         # TODO: Abuse of notation - these aren't really logits  (issue #1187)
         logits = self.regression_head(pooled=encoder_output.pooled)
         if compute_loss:
@@ -67,7 +75,14 @@ class RegressionModel(Taskmodel):
             results = LogitsAndLossOutput(logits=logits, loss=loss, other=encoder_output.other)
         else:
             results = LogitsOutput(logits=logits, other=encoder_output.other)
-        return (results, StaticEncoderOutput(encoder_output)) if get_encoder_output else results
+
+        if get_encoder_output:
+            return (
+                results,
+                StaticEncoderOutput(encoder_output, extract_hidden_states=get_encoder_output)
+            )
+        else:
+            return results
 
 
 class MultipleChoiceModel(Taskmodel):
@@ -76,7 +91,9 @@ class MultipleChoiceModel(Taskmodel):
         self.num_choices = num_choices
         self.choice_scoring_head = choice_scoring_head
 
-    def forward(self, batch, task, tokenizer, compute_loss: bool = False, loss_weights: torch.Tensor = None):
+    def forward(self, batch, task, tokenizer, compute_loss: bool = False, loss_weights: torch.Tensor = None, get_encoder_output: bool = False):
+        if get_encoder_output:
+            raise NotImplementedError()
         input_ids = batch.input_ids
         segment_ids = batch.segment_ids
         input_mask = batch.input_mask
@@ -127,8 +144,10 @@ class SpanComparisonModel(Taskmodel):
         super().__init__(encoder=encoder)
         self.span_comparison_head = span_comparison_head
 
-    def forward(self, batch, task, tokenizer, compute_loss: bool = False, loss_weights: torch.Tensor = None):
+    def forward(self, batch, task, tokenizer, compute_loss: bool = False, loss_weights: torch.Tensor = None, get_encoder_output: bool = False):
         if loss_weights is not None:
+            raise NotImplementedError()
+        if get_encoder_output is not None:
             raise NotImplementedError()
         encoder_output = get_output_from_encoder_and_batch(encoder=self.encoder, batch=batch)
         logits = self.span_comparison_head(unpooled=encoder_output.unpooled, spans=batch.spans)
@@ -151,8 +170,10 @@ class SpanPredictionModel(Taskmodel):
         # we can guarantee the output distribution will only be non-zero at those dimensions.
         self.span_prediction_head = span_prediction_head
 
-    def forward(self, batch, task, tokenizer, compute_loss: bool = False, loss_weights: torch.Tensor = None):
+    def forward(self, batch, task, tokenizer, compute_loss: bool = False, loss_weights: torch.Tensor = None, get_encoder_output: bool = False):
         if loss_weights is not None:
+            raise NotImplementedError()
+        if get_encoder_output is not None:
             raise NotImplementedError()
         encoder_output = get_output_from_encoder_and_batch(encoder=self.encoder, batch=batch)
         logits = self.span_prediction_head(unpooled=encoder_output.unpooled)
@@ -174,8 +195,10 @@ class MultiLabelSpanComparisonModel(Taskmodel):
         super().__init__(encoder=encoder)
         self.span_comparison_head = span_comparison_head
 
-    def forward(self, batch, task, tokenizer, compute_loss: bool = False, loss_weights: torch.Tensor = None):
+    def forward(self, batch, task, tokenizer, compute_loss: bool = False, loss_weights: torch.Tensor = None, get_encoder_output: bool = False):
         if loss_weights is not None:
+            raise NotImplementedError()
+        if get_encoder_output is not None:
             raise NotImplementedError()
         encoder_output = get_output_from_encoder_and_batch(encoder=self.encoder, batch=batch)
         logits = self.span_comparison_head(unpooled=encoder_output.unpooled, spans=batch.spans)
@@ -196,8 +219,10 @@ class TokenClassificationModel(Taskmodel):
         super().__init__(encoder=encoder)
         self.token_classification_head = token_classification_head
 
-    def forward(self, batch, task, tokenizer, compute_loss: bool = False, loss_weights: torch.Tensor = None):
+    def forward(self, batch, task, tokenizer, compute_loss: bool = False, loss_weights: torch.Tensor = None, get_encoder_output: bool = False):
         if loss_weights is not None:
+            raise NotImplementedError()
+        if get_encoder_output is not None:
             raise NotImplementedError()
         encoder_output = get_output_from_encoder_and_batch(encoder=self.encoder, batch=batch)
         logits = self.token_classification_head(unpooled=encoder_output.unpooled)
@@ -217,7 +242,9 @@ class QAModel(Taskmodel):
         super().__init__(encoder=encoder)
         self.qa_head = qa_head
 
-    def forward(self, batch, task, tokenizer, compute_loss: bool = False, loss_weights: torch.Tensor = None):
+    def forward(self, batch, task, tokenizer, compute_loss: bool = False, loss_weights: torch.Tensor = None, get_encoder_output: bool = False):
+        if get_encoder_output is not None:
+            raise NotImplementedError()
         encoder_output = get_output_from_encoder_and_batch(encoder=self.encoder, batch=batch)
         logits = self.qa_head(unpooled=encoder_output.unpooled)
         if compute_loss:
@@ -237,8 +264,10 @@ class MLMModel(Taskmodel):
         super().__init__(encoder=encoder)
         self.mlm_head = mlm_head
 
-    def forward(self, batch, task, tokenizer, compute_loss: bool = False, loss_weights: torch.Tensor = None):
+    def forward(self, batch, task, tokenizer, compute_loss: bool = False, loss_weights: torch.Tensor = None, get_encoder_output: bool = False):
         if loss_weights is not None:
+            raise NotImplementedError()
+        if get_encoder_output is not None:
             raise NotImplementedError()
         masked_batch = batch.get_masked(
             mlm_probability=task.mlm_probability, tokenizer=tokenizer, do_mask=task.do_mask,
@@ -263,8 +292,10 @@ class EmbeddingModel(Taskmodel):
         self.pooler_head = pooler_head
         self.layer = layer
 
-    def forward(self, batch, task, tokenizer, compute_loss: bool = False, loss_weights: torch.Tensor = None):
+    def forward(self, batch, task, tokenizer, compute_loss: bool = False, loss_weights: torch.Tensor = None, get_encoder_output: bool = False):
         if loss_weights is not None:
+            raise NotImplementedError()
+        if get_encoder_output is not None:
             raise NotImplementedError()
         with transformer_utils.output_hidden_states_context(self.encoder):
             encoder_output = get_output_from_encoder_and_batch(encoder=self.encoder, batch=batch)
@@ -296,18 +327,26 @@ class EncoderOutput:
     pooled: torch.Tensor
     unpooled: torch.Tensor
     other: Any = None
+    hidden_states_pooled: Any = None
+    unhidden_states_pooled: Any = None
     # Extend later with attention, hidden_acts, etc
 
 
 class StaticEncoderOutput:
 
-    def __init__(self, output: EncoderOutput):
+    def __init__(self,
+                 output: EncoderOutput):
         self.pooled = output.pooled.detach().cpu().numpy()
         self.unpooled = output.unpooled.detach().cpu().numpy()
-        # self.other = output.other.detach().cpu().numpy() if output.other is not None else None
+        self.hidden_states_pooled = None
+        if output.hidden_states_pooled is not None:
+            self.hidden_states_pooled = [
+                hidden_states.detach().cpu().numpy()
+                for hidden_states in output.hidden_states_pooled
+            ]
 
 
-def get_output_from_encoder_and_batch(encoder, batch) -> EncoderOutput:
+def get_output_from_encoder_and_batch(encoder, batch, get_hidden_states: bool = False) -> EncoderOutput:
     """Pass batch to encoder, return encoder model output.
 
     Args:
@@ -323,10 +362,12 @@ def get_output_from_encoder_and_batch(encoder, batch) -> EncoderOutput:
         input_ids=batch.input_ids,
         segment_ids=batch.segment_ids,
         input_mask=batch.input_mask,
+        get_hidden_states=get_hidden_states,
     )
 
 
-def get_output_from_encoder(encoder, input_ids, segment_ids, input_mask) -> EncoderOutput:
+def get_output_from_encoder(encoder, input_ids, segment_ids, input_mask,
+                            get_hidden_states: bool = False) -> EncoderOutput:
     """Pass inputs to encoder, return encoder output.
 
     Args:
@@ -343,18 +384,21 @@ def get_output_from_encoder(encoder, input_ids, segment_ids, input_mask) -> Enco
 
     """
     model_arch = ModelArchitectures.from_encoder(encoder)
+    hidden_states_pooled = None
     if model_arch in [
         ModelArchitectures.BERT,
         ModelArchitectures.ROBERTA,
         ModelArchitectures.ALBERT,
         ModelArchitectures.XLM_ROBERTA,
     ]:
-        pooled, unpooled, other = get_output_from_standard_transformer_models(
+        pooled, unpooled, hidden_states_pooled, other = get_output_from_standard_transformer_models(
             encoder=encoder, input_ids=input_ids, segment_ids=segment_ids, input_mask=input_mask,
+            get_hidden_states=get_hidden_states,
         )
     elif model_arch == ModelArchitectures.ELECTRA:
         pooled, unpooled, other = get_output_from_electra(
             encoder=encoder, input_ids=input_ids, segment_ids=segment_ids, input_mask=input_mask,
+            get_hidden_states=get_hidden_states,
         )
     elif model_arch in [
         ModelArchitectures.BART,
@@ -362,30 +406,63 @@ def get_output_from_encoder(encoder, input_ids, segment_ids, input_mask) -> Enco
     ]:
         pooled, unpooled, other = get_output_from_bart_models(
             encoder=encoder, input_ids=input_ids, input_mask=input_mask,
+            get_hidden_states=get_hidden_states,
         )
     else:
         raise KeyError(model_arch)
 
     # Extend later with attention, hidden_acts, etc
-    if other:
-        return EncoderOutput(pooled=pooled, unpooled=unpooled, other=other)
+    return EncoderOutput(pooled=pooled,
+                         unpooled=unpooled,
+                         other=other,
+                         hidden_states_pooled=hidden_states_pooled)
+
+
+def get_output_from_standard_transformer_models(
+        encoder, input_ids, segment_ids, input_mask,
+        get_hidden_states: bool = False)\
+        -> Tuple[torch.Tensor, torch.Tensor, Optional[Any], Optional[Any]]:
+    output = encoder(input_ids=input_ids, token_type_ids=segment_ids, attention_mask=input_mask,
+                     output_hidden_states=get_hidden_states)
+    if get_hidden_states:
+        pooled, unpooled, hidden_states, other = output[1], output[0], output[2], output[3:]
+
+        # token単位のhidden_statesを返してしまうと，サイズが大きすぎて典型的なメモリに乗らない．
+        # よって，poolingしてから返す．
+        model_arch = ModelArchitectures.from_encoder(encoder)
+        if model_arch in [ModelArchitectures.BERT,
+                          ModelArchitectures.ROBERTA,
+                          ModelArchitectures.XLM_ROBERTA]:
+            hidden_states_pooled = [
+                encoder.pooler(layer_hidden_states)
+                for layer_hidden_states in hidden_states
+            ]
+        elif model_arch in [ModelArchitectures.ALBERT]:
+            hidden_states_pooled = [
+                encoder.pooler_activation(encoder.pooler(layer_hidden_states[:, 0]))
+                for layer_hidden_states in hidden_states
+            ]
+        else:
+            raise NotImplementedError(f'"get_hidden_states" for model_arch="model_arch"')
+
     else:
-        return EncoderOutput(pooled=pooled, unpooled=unpooled)
+        pooled, unpooled, hidden_states_pooled, other = output[1], output[0], None, output[2:]
+
+    return pooled, unpooled, hidden_states_pooled, other or None
 
 
-def get_output_from_standard_transformer_models(encoder, input_ids, segment_ids, input_mask):
-    output = encoder(input_ids=input_ids, token_type_ids=segment_ids, attention_mask=input_mask)
-    pooled, unpooled, other = output[1], output[0], output[2:]
-    return pooled, unpooled, other
-
-
-def get_output_from_bart_models(encoder, input_ids, input_mask):
+def get_output_from_bart_models(
+        encoder, input_ids, input_mask,
+        get_hidden_states: bool = False)\
+        -> Tuple[torch.Tensor, torch.Tensor, Optional[Any]]:
     # BART and mBART and encoder-decoder architectures.
     # As described in the BART paper and implemented in Transformers,
     # for single input tasks, the encoder input is the sequence,
     # the decode input is 1-shifted sequence, and the resulting
     # sentence representation is the final decoder state.
     # That's what we use for `unpooled` here.
+    if get_hidden_states:
+        raise NotImplementedError()
     dec_last, dec_all, enc_last, enc_all = encoder(
         input_ids=input_ids, attention_mask=input_mask, output_hidden_states=True,
     )
@@ -397,14 +474,20 @@ def get_output_from_bart_models(encoder, input_ids, input_mask):
     batch_idx = torch.arange(bsize).to(input_ids.device)
     # Get last non-pad index
     pooled = unpooled[batch_idx, slen - input_ids.eq(encoder.config.pad_token_id).sum(1) - 1]
-    return pooled, unpooled, other
+    return pooled, unpooled, other or None
 
 
-def get_output_from_electra(encoder, input_ids, segment_ids, input_mask):
+def get_output_from_electra(
+        encoder, input_ids, segment_ids, input_mask,
+        get_hidden_states: bool = False)\
+        -> Tuple[torch.Tensor, torch.Tensor, Optional[Any]]:
+
+    if get_hidden_states:
+        raise NotImplementedError()
     output = encoder(input_ids=input_ids, token_type_ids=segment_ids, attention_mask=input_mask)
     unpooled = output[0]
     pooled = unpooled[:, 0, :]
-    return pooled, unpooled, output
+    return pooled, unpooled, output or None
 
 
 def compute_mlm_loss(logits, masked_lm_labels):

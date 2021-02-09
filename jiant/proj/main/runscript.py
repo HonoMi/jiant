@@ -209,7 +209,7 @@ def run_loop(args: RunConfiguration, checkpoint=None):
                 task_name_list=runner.jiant_task_container.task_run_config.train_task_list,
                 get_preds=args.write_train_preds,
                 global_step=None,
-                get_encoder_output=(True if args.write_train_encoder_outputs else False),
+                get_encoder_output=args.write_train_encoder_outputs,
             )
             if args.do_train_eval:
                 jiant_evaluate.write_train_eval_results(
@@ -232,6 +232,7 @@ def run_loop(args: RunConfiguration, checkpoint=None):
             assert not args.write_val_preds
 
         if args.do_val or args.write_val_preds or args.write_val_encoder_outputs:
+
             val_results_dict = runner.run_val(
                 task_name_list=runner.jiant_task_container.task_run_config.val_task_list,
                 get_preds=args.write_val_preds,

@@ -511,6 +511,14 @@ def run_val(
         output["encoder_outputs_unpooled"] = np.concatenate([
             encoder_output.unpooled for encoder_output in encoder_outputs
         ])
+
+        output["hidden_states_pooled"] = []
+        for i_layer in range(0, len(encoder_outputs[0].hidden_states_pooled)):
+            output["hidden_states_pooled"].append(
+                np.concatenate([encoder_output.hidden_states_pooled[i_layer]
+                                for encoder_output in encoder_outputs])
+            )
+
     if global_step is not None:
         tf_writer.add_scalar(f'{split}/loss', eval_loss, global_step=global_step)
 
@@ -572,4 +580,11 @@ def run_test(
         output["encoder_outputs_unpooled"] = np.concatenate([
             encoder_output.unpooled for encoder_output in encoder_outputs
         ])
+
+        output["hidden_states_pooled"] = []
+        for i_layer in range(0, len(encoder_outputs[0].hidden_states_pooled)):
+            output["hidden_states_pooled"].append(
+                np.concatenate([encoder_output.hidden_states_pooled[i_layer]
+                                for encoder_output in encoder_outputs])
+            )
     return output

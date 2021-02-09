@@ -85,3 +85,4 @@ def write_encoder_outputs(eval_results_dict: dict, output_dir: str):
         os.makedirs(_output_dir, exist_ok=True)
         np.save(_output_dir + '/encoder_outputs_pooled.npy', results['encoder_outputs_pooled'])
         np.save(_output_dir + '/encoder_outputs_unpooled.npy', results['encoder_outputs_unpooled'])
+        np.save(_output_dir + '/hidden_states_pooled.npy', results['hidden_states_pooled'])
