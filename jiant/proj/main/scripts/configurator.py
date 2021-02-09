@@ -74,7 +74,6 @@ def resolve_steps(self,
     else:
         self.weighted_sampling_start_step = max_steps + 1
 
-
     second_stage_start_steps = self.weighted_sampling_start_step or self.weighted_loss_start_step or max_steps + 1
 
     first_stage_steps = second_stage_start_steps
@@ -86,7 +85,7 @@ def resolve_steps(self,
     else:
         rewarmup_steps = second_stage_steps * self.rewarmup_steps_proportion
 
-    return first_stage_steps, second_stage_start_steps, warmup_steps, rewarmup_steps
+    return first_stage_steps, second_stage_steps, warmup_steps, rewarmup_steps
 
 
 
