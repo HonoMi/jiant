@@ -226,7 +226,7 @@ def run_loop(args: RunConfiguration, checkpoint=None):
             if args.write_train_encoder_outputs:
                 jiant_evaluate.write_encoder_outputs(
                     eval_results_dict=train_eval_results_dict,
-                    output_dir=args.output_dir,
+                    output_dir=os.path.join(args.output_dir, "train_encoder_outputs"),
                 )
         else:
             assert not args.write_val_preds
@@ -253,7 +253,7 @@ def run_loop(args: RunConfiguration, checkpoint=None):
             if args.write_val_encoder_outputs:
                 jiant_evaluate.write_encoder_outputs(
                     eval_results_dict=val_results_dict,
-                    output_dir=args.output_dir,
+                    output_dir=os.path.join(args.output_dir, "val_encoder_outputs"),
                 )
         else:
             assert not args.write_val_preds
@@ -279,7 +279,7 @@ def run_loop(args: RunConfiguration, checkpoint=None):
             if args.write_test_encoder_outputs:
                 jiant_evaluate.write_encoder_outputs(
                     eval_results_dict=test_results_dict,
-                    output_dir=args.output_dir,
+                    output_dir=os.path.join(args.output_dir, "test_encoder_outputs"),
                 )
 
     if (

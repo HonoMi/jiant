@@ -6,6 +6,7 @@ import torch
 import torch.nn as nn
 import pandas as pd
 from torch.utils.data import Dataset, DataLoader
+import numpy as np
 
 import jiant.shared.caching as caching
 import jiant.utils.python.io as py_io
@@ -54,22 +55,41 @@ def get_train_dataloader_from_cache(
     sample_weights_path=None,
     fix_seed_for_weighted_sampler=False,
 ):
+    """shuffleの方針: samplerのみでshuffleする．"""
     # TODO: Expose buffer_size parameter  (issue #1183)
+    
+    dataset = train_cache.get_iterable_dataset(buffer_size=10000, shuffle=False)
+    dataset = _ListDataset([elem for elem in dataset])
 
+    sample_weights = None
     if sample_weights_path is not None:
-        dataset = train_cache.get_iterable_dataset(buffer_size=10000, shuffle=False)
-        dataset = _ListDataset([elem for elem in dataset])
-        _sample_weights = pd.read_csv(sample_weights_path, sep='\t', header=None)[0]
-        sampler = WeightedDatasetSampler(dataset, _sample_weights, fix_seed=fix_seed_for_weighted_sampler)
-    else:
-        dataset = train_cache.get_iterable_dataset(buffer_size=10000, shuffle=True)
-        sampler = None
+        sample_weights = pd.read_csv(sample_weights_path, sep='\t', header=None)[0]
+
+    sampler = WeightedDatasetSampler(len(dataset),
+                                     sample_weights=sample_weights,
+                                     same_samples_over_epochs=fix_seed_for_weighted_sampler,
+                                     sample_then_shuffle_every_epoch=True)
 
     train_dataloader = torch_utils.DataLoaderWithLength(
         dataset=dataset, batch_size=train_batch_size, collate_fn=task.collate_fn,
         sampler=sampler
     )
     return train_dataloader
+
+    # if sample_weights_path is not None:
+    #     dataset = train_cache.get_iterable_dataset(buffer_size=10000, shuffle=False)
+    #     dataset = _ListDataset([elem for elem in dataset])
+    #     _sample_weights = pd.read_csv(sample_weights_path, sep='\t', header=None)[0]
+    #     sampler = WeightedDatasetSampler(dataset, _sample_weights, fix_seed=fix_seed_for_weighted_sampler)
+    # else:
+    #     dataset = train_cache.get_iterable_dataset(buffer_size=10000, shuffle=True)
+    #     sampler = None
+
+    # train_dataloader = torch_utils.DataLoaderWithLength(
+    #     dataset=dataset, batch_size=train_batch_size, collate_fn=task.collate_fn,
+    #     sampler=sampler
+    # )
+    # return train_dataloader
 
 
 def get_eval_dataloader_from_cache(

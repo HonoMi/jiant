@@ -77,10 +77,7 @@ class RegressionModel(Taskmodel):
             results = LogitsOutput(logits=logits, other=encoder_output.other)
 
         if get_encoder_output:
-            return (
-                results,
-                StaticEncoderOutput(encoder_output, extract_hidden_states=get_encoder_output)
-            )
+            return (results, StaticEncoderOutput(encoder_output))
         else:
             return results
 
