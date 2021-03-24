@@ -53,7 +53,7 @@ def complex_backpropagate(
 def get_train_dataloader_from_cache(
     train_cache: caching.ChunkedFilesDataCache, task, train_batch_size: int,
     sample_weights_path=None,
-    fix_seed_for_weighted_sampler=False,
+    same_samples_over_epochs=False,
 ):
     """shuffleの方針: samplerのみでshuffleする．"""
     # TODO: Expose buffer_size parameter  (issue #1183)
@@ -63,11 +63,14 @@ def get_train_dataloader_from_cache(
 
     sample_weights = None
     if sample_weights_path is not None:
+        logger.info('using sample weights from "%s"', sample_weights_path)
         sample_weights = pd.read_csv(sample_weights_path, sep='\t', header=None)[0]
 
+    if same_samples_over_epochs:
+        logger.info('using same samples over epochs')
     sampler = WeightedDatasetSampler(len(dataset),
                                      sample_weights=sample_weights,
-                                     same_samples_over_epochs=fix_seed_for_weighted_sampler,
+                                     same_samples_over_epochs=same_samples_over_epochs,
                                      sample_then_shuffle_every_epoch=True)
 
     train_dataloader = torch_utils.DataLoaderWithLength(
@@ -80,7 +83,7 @@ def get_train_dataloader_from_cache(
     #     dataset = train_cache.get_iterable_dataset(buffer_size=10000, shuffle=False)
     #     dataset = _ListDataset([elem for elem in dataset])
     #     _sample_weights = pd.read_csv(sample_weights_path, sep='\t', header=None)[0]
-    #     sampler = WeightedDatasetSampler(dataset, _sample_weights, fix_seed=fix_seed_for_weighted_sampler)
+    #     sampler = WeightedDatasetSampler(dataset, _sample_weights, fix_seed=same_samples_over_epochs)
     # else:
     #     dataset = train_cache.get_iterable_dataset(buffer_size=10000, shuffle=True)
     #     sampler = None

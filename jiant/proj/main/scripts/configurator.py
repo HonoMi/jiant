@@ -150,7 +150,7 @@ class SingleTaskConfigurator(zconf.RunConfig):
     no_rewarmup_in_second_stage = zconf.attr(action="store_true")
     warmup_steps_proportion = zconf.attr(type=float, default=0.1)
     rewarmup_steps_proportion = zconf.attr(type=float, default=0.1)
-    fix_seed_for_weighted_sampler = zconf.attr(action="store_true")
+    same_samples_over_epochs = zconf.attr(action="store_true")
     epochs = zconf.attr(type=int, default=None)
     max_steps = zconf.attr(type=int, default=None)
     num_gpus = zconf.attr(type=int, default=None)
@@ -248,7 +248,7 @@ class SingleTaskConfigurator(zconf.RunConfig):
                 "weighted_sampling_start_step": self.weighted_sampling_start_step,
                 "weighted_loss_start_step": self.weighted_loss_start_step,
 
-                "fix_seed_for_weighted_sampler": self.fix_seed_for_weighted_sampler,
+                "same_samples_over_epochs": self.same_samples_over_epochs,
             },
             "task_specific_configs_dict": {
                 self.task_name: {
@@ -338,7 +338,7 @@ class SimpleAPIMultiTaskConfigurator(zconf.RunConfig):
     weighted_loss_start_step = zconf.attr(type=int, default=None)
     weighted_loss_start_epoch = zconf.attr(type=int, default=None)
     no_rewarmup_in_second_stage = zconf.attr(action="store_true")
-    fix_seed_for_weighted_sampler = zconf.attr(action="store_true")
+    same_samples_over_epochs = zconf.attr(action="store_true")
     epochs = zconf.attr(type=int, default=None)
     max_steps = zconf.attr(type=int, default=None)
     num_gpus = zconf.attr(type=int, default=None)
@@ -526,7 +526,7 @@ class SimpleAPIMultiTaskConfigurator(zconf.RunConfig):
 
                 "weighted_sampling_start_step": self.weighted_sampling_start_step,
                 "weighted_loss_start_step": self.weighted_loss_start_step,
-                "fix_seed_for_weighted_sampler": self.fix_seed_for_weighted_sampler,
+                "same_samples_over_epochs": self.same_samples_over_epochs,
             },
             "task_specific_configs_dict": {
                 task_name: {

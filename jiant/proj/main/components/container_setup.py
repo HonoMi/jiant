@@ -31,7 +31,7 @@ class GlobalTrainConfig(ExtendedDataClassMixin):
     rewarmup_steps: int
     weighted_sampling_start_step: int
     weighted_loss_start_step: int
-    fix_seed_for_weighted_sampler: bool
+    same_samples_over_epochs: bool
 
 
 

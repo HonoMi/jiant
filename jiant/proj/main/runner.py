@@ -322,7 +322,7 @@ class JiantRunner:
                     get_train_dataloader_from_cache(
                         train_cache=train_cache, task=task, train_batch_size=task_specific_config.train_batch_size,
                         sample_weights_path=sample_weights_path,
-                        fix_seed_for_weighted_sampler=self.jiant_task_container.global_train_config.fix_seed_for_weighted_sampler,
+                        same_samples_over_epochs=self.jiant_task_container.global_train_config.same_samples_over_epochs,
                     ),
                 )
         return train_dataloader_dict
